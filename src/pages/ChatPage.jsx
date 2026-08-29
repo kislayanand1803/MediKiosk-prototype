@@ -172,22 +172,22 @@ export default function ChatPage() {
   const currentChips = getQuickReplies(step, lastUserMessage);
 
   return (
-    <div className="flex flex-col h-screen max-w-2xl mx-auto bg-white shadow-lg border-x">
+    <div className="flex flex-col h-[100dvh] max-w-2xl mx-auto bg-white shadow-lg border-x">
       {/* Header */}
-      <div className="p-4 bg-blue-600 text-white flex items-center justify-between shadow-md z-10">
-        <div className="flex items-center gap-2">
-          <Bot size={24} />
-          <div>
-            <h2 className="font-bold text-base leading-tight">
+      <div className="p-3 sm:p-4 bg-blue-600 text-white flex items-center justify-between shadow-md z-10">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <Bot size={24} className="flex-shrink-0" />
+          <div className="truncate">
+            <h2 className="font-bold text-sm sm:text-base leading-tight truncate">
               MediKiosk Clinical Intake
             </h2>
-            <p className="text-[11px] text-blue-100">
+            <p className="text-[10px] sm:text-[11px] text-blue-100 truncate">
               Patient: {patientInfo.name} ({patientInfo.age}y/
               {patientInfo.gender})
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
             onClick={() => {
               if (isVoiceOn) window.speechSynthesis.cancel();
@@ -209,14 +209,14 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50 pb-6">
+      <div className="flex-1 p-3 sm:p-4 overflow-y-auto space-y-4 bg-gray-50 pb-6">
         {messages.map((msg, idx) => (
           <div
             key={idx}
             className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] p-3.5 rounded-2xl text-sm leading-relaxed ${
+              className={`max-w-[85%] sm:max-w-[80%] p-3.5 rounded-2xl text-sm leading-relaxed break-words ${
                 msg.sender === "user"
                   ? "bg-blue-600 text-white rounded-br-none shadow-sm"
                   : "bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm"
@@ -237,7 +237,7 @@ export default function ChatPage() {
         {step >= 3 && (
           <div className="bg-white p-3.5 rounded-xl border border-blue-200 shadow-sm space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+              <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5 flex-wrap">
                 <FileImage size={16} className="text-blue-600" /> Module B:
                 Physical Medical Document / Lab OCR
               </span>
@@ -255,13 +255,14 @@ export default function ChatPage() {
             </div>
 
             {uploadedDocBase64 ? (
-              <div className="flex items-center gap-2 bg-blue-50 p-2 rounded border border-blue-100 text-xs text-blue-900">
-                <span className="font-semibold">Attached:</span> {docFileName}
+              <div className="flex items-center gap-2 bg-blue-50 p-2 rounded border border-blue-100 text-xs text-blue-900 truncate">
+                <span className="font-semibold flex-shrink-0">Attached:</span>{" "}
+                <span className="truncate">{docFileName}</span>
               </div>
             ) : (
-              <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 hover:border-blue-500 py-3 rounded-lg cursor-pointer bg-gray-50 transition text-xs text-gray-600 font-medium">
-                <Upload size={16} className="text-gray-400" /> Upload
-                Prescription / Lab Report Image
+              <label className="flex items-center justify-center gap-2 border-2 border-dashed border-gray-300 hover:border-blue-500 py-3 rounded-lg cursor-pointer bg-gray-50 transition text-xs text-gray-600 font-medium text-center px-2">
+                <Upload size={16} className="text-gray-400 flex-shrink-0" />{" "}
+                Upload Prescription / Lab Report Image
                 <input
                   type="file"
                   accept="image/*"
@@ -302,12 +303,12 @@ export default function ChatPage() {
       {/* Input & Quick Replies */}
       <div className="bg-white border-t">
         {currentChips.length > 0 && (
-          <div className="flex gap-2 p-2.5 overflow-x-auto bg-gray-50 border-b">
+          <div className="flex gap-2 p-2.5 overflow-x-auto bg-gray-50 border-b scrollbar-none">
             {currentChips.map((chip, idx) => (
               <button
                 key={idx}
                 onClick={() => processMessage(chip)}
-                className="whitespace-nowrap px-3.5 py-1.5 bg-white border border-blue-200 text-blue-700 text-xs rounded-full hover:bg-blue-50 hover:border-blue-600 transition shadow-sm font-medium"
+                className="whitespace-nowrap px-3.5 py-1.5 bg-white border border-blue-200 text-blue-700 text-xs rounded-full hover:bg-blue-50 hover:border-blue-600 transition shadow-sm font-medium flex-shrink-0"
               >
                 {chip}
               </button>
@@ -315,19 +316,19 @@ export default function ChatPage() {
           </div>
         )}
 
-        <form onSubmit={handleSend} className="p-3.5 flex gap-2">
+        <form onSubmit={handleSend} className="p-3 flex gap-2">
           <input
             type="text"
             disabled={step === TOTAL_STEPS || isAnalyzing}
             className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100 text-sm"
-            placeholder="Type your response or select from options above..."
+            placeholder="Type your response or select options..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
           />
           <button
             type="submit"
             disabled={step === TOTAL_STEPS || isAnalyzing}
-            className="p-2.5 bg-blue-600 text-white rounded-full disabled:bg-gray-300 hover:bg-blue-700 transition"
+            className="p-2.5 bg-blue-600 text-white rounded-full disabled:bg-gray-300 hover:bg-blue-700 transition flex-shrink-0"
           >
             <Send size={18} />
           </button>
