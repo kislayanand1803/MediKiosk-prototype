@@ -77,14 +77,14 @@ export default function DoctorDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8">
+    <div className="min-h-screen bg-gray-100 p-3 sm:p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-4">
         {/* Header */}
-        <header className="flex justify-between items-center bg-white p-4 rounded-xl border shadow-sm">
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-4 rounded-xl border shadow-sm gap-3">
           <div>
-            <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-              <Stethoscope className="text-blue-600" /> MediKiosk Physician
-              Portal
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 flex items-center gap-2">
+              <Stethoscope className="text-blue-600 flex-shrink-0" /> MediKiosk
+              Physician Portal
             </h1>
             <p className="text-xs text-gray-500">
               SIH26047 • ABDM & Ayush Clinical Triage
@@ -92,7 +92,7 @@ export default function DoctorDashboard() {
           </div>
           <button
             onClick={() => navigate("/")}
-            className="text-blue-600 text-xs hover:underline font-bold bg-blue-50 px-3 py-1.5 rounded-lg"
+            className="text-blue-600 text-xs hover:underline font-bold bg-blue-50 px-3 py-1.5 rounded-lg w-full sm:w-auto text-center"
           >
             + New Patient Simulation
           </button>
@@ -114,9 +114,9 @@ export default function DoctorDashboard() {
           </div>
         )}
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Patient Queue Column */}
-          <div className="col-span-1 bg-white rounded-xl shadow-sm border p-4 h-[750px]">
+          <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border p-4 lg:h-[750px]">
             <h3 className="font-bold text-gray-800 text-sm mb-3 border-b pb-2">
               Incoming Cases (ABHA Linked)
             </h3>
@@ -124,16 +124,16 @@ export default function DoctorDashboard() {
               className={`p-3.5 border rounded-xl transition ${isApproved ? "bg-white opacity-60 border-gray-200" : "bg-blue-50 border-blue-200 shadow-sm"}`}
             >
               <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-bold text-gray-900">
+                <div className="truncate pr-2">
+                  <p className="font-bold text-gray-900 truncate">
                     {currentPatient.name}
                   </p>
-                  <p className="text-[11px] text-gray-500">
+                  <p className="text-[11px] text-gray-500 truncate">
                     ABHA: {currentPatient.abhaId}
                   </p>
                 </div>
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${
                     currentPatient.urgencyLevel === "Urgent"
                       ? "bg-red-100 text-red-800"
                       : isApproved
@@ -148,16 +148,16 @@ export default function DoctorDashboard() {
           </div>
 
           {/* Structured Case Report Column */}
-          <div className="col-span-2 bg-white rounded-xl shadow-sm border p-6 h-[750px] overflow-y-auto space-y-6">
-            <div className="flex justify-between items-center border-b pb-4">
-              <h2 className="text-lg font-black flex items-center gap-2 text-gray-900">
-                <FileText className="text-blue-600" size={20} />{" "}
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border p-4 sm:p-6 lg:h-[750px] lg:overflow-y-auto space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b pb-4 gap-3">
+              <h2 className="text-base sm:text-lg font-black flex items-center gap-2 text-gray-900">
+                <FileText className="text-blue-600 flex-shrink-0" size={20} />{" "}
                 Pre-Consultation Clinical Record
               </h2>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => setIsEditing(!isEditing)}
-                  className={`flex items-center gap-1.5 text-xs px-3.5 py-2 rounded-lg font-bold transition ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs px-3.5 py-2 rounded-lg font-bold transition ${
                     isEditing
                       ? "bg-blue-100 text-blue-800"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -169,25 +169,25 @@ export default function DoctorDashboard() {
                 <button
                   onClick={() => setIsApproved(true)}
                   disabled={isApproved}
-                  className={`flex items-center gap-1.5 text-xs px-4 py-2 rounded-lg font-bold text-white shadow-sm transition ${
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 text-xs px-4 py-2 rounded-lg font-bold text-white shadow-sm transition ${
                     isApproved
                       ? "bg-green-600 cursor-default"
                       : "bg-blue-600 hover:bg-blue-700"
                   }`}
                 >
                   <Check size={14} />{" "}
-                  {isApproved ? "Case Approved" : "Approve & Push to HIS"}
+                  {isApproved ? "Case Approved" : "Approve & Push"}
                 </button>
               </div>
             </div>
 
             {/* Demographics */}
-            <div className="grid grid-cols-3 gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-200/60">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-200/60">
               <div>
                 <p className="text-[10px] text-gray-500 uppercase font-bold">
                   Patient Details
                 </p>
-                <p className="font-bold text-gray-900 text-sm">
+                <p className="font-bold text-gray-900 text-sm truncate">
                   {currentPatient.name}
                 </p>
                 <p className="text-xs text-gray-500">
@@ -206,7 +206,7 @@ export default function DoctorDashboard() {
                 <p className="text-[10px] text-gray-500 uppercase font-bold">
                   Differential Diagnosis
                 </p>
-                <p className="font-bold text-gray-800 text-sm">
+                <p className="font-bold text-gray-800 text-sm truncate">
                   {currentPatient.possibleDiagnosis}
                 </p>
               </div>
@@ -225,7 +225,7 @@ export default function DoctorDashboard() {
                   onChange={(e) => setCaseNotes(e.target.value)}
                 />
               ) : (
-                <p className="text-gray-700 text-xs bg-yellow-50/70 p-3.5 rounded-xl border border-yellow-200 leading-relaxed">
+                <p className="text-gray-700 text-xs bg-yellow-50/70 p-3.5 rounded-xl border border-yellow-200 leading-relaxed break-words">
                   {caseNotes}
                 </p>
               )}
@@ -234,30 +234,32 @@ export default function DoctorDashboard() {
             {/* Module B: Document OCR Findings */}
             <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
               <h4 className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
-                <FileSearch size={14} className="text-blue-600" /> Digitized
-                Prior Records / Lab OCR
+                <FileSearch size={14} className="text-blue-600 flex-shrink-0" />{" "}
+                Digitized Prior Records / Lab OCR
               </h4>
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-slate-600 break-words">
                 {currentPatient.extractedDocNotes ||
                   "No prior records attached during this session."}
               </p>
             </div>
 
             {/* Ayush Dashavidha Parameters: Agni & Ahara-Vihara */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200">
                 <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
-                  <Flame size={14} /> Agni Pariksha (Digestive Fire)
+                  <Flame size={14} className="flex-shrink-0" /> Agni Pariksha
+                  (Digestive Fire)
                 </span>
-                <p className="text-xs text-amber-800 mt-1">
+                <p className="text-xs text-amber-800 mt-1 break-words">
                   {currentPatient.agniStatus || "Samagni"}
                 </p>
               </div>
               <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
                 <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
-                  <Apple size={14} /> Ahara-Vihara (Diet & Lifestyle)
+                  <Apple size={14} className="flex-shrink-0" /> Ahara-Vihara
+                  (Diet & Lifestyle)
                 </span>
-                <p className="text-xs text-emerald-800 mt-1">
+                <p className="text-xs text-emerald-800 mt-1 break-words">
                   {currentPatient.aharaVihara || "Balanced routine"}
                 </p>
               </div>
@@ -330,7 +332,7 @@ export default function DoctorDashboard() {
                             style={{ width: `${item.value}%` }}
                           />
                         </div>
-                        <p className="text-[10px] text-gray-500 italic">
+                        <p className="text-[10px] text-gray-500 italic break-words">
                           💡{" "}
                           <strong className="text-gray-700">
                             {info.desc.split("(")[0]}
