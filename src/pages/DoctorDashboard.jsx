@@ -26,17 +26,19 @@ export default function DoctorDashboard() {
   const location = useLocation();
 
   const defaultPatient = {
-    name: "Rahul Sharma",
-    age: "28",
+    name: "Rohit",
+    age: "52",
     gender: "Male",
     abhaId: "91-4582-1923-8821",
-    primaryComplaint: "Severe Throbbing Headache (Shiroga Roga)",
+    primaryComplaint: "Severe Throbbing Headache & Acid Indigestion",
     subjectiveHistory:
       "Patient reports intense throbbing headache localized to the temporal region for 2 days. Reports irregular bowel movements and sleep disturbances.",
-    possibleDiagnosis: "Vata-Pitta Shiroroga / Potential Tension Migraine",
+    possibleDiagnosis:
+      "Vata-Pitta Shiroroga / Tension Migraine with Agni Imbalance",
     extractedDocNotes:
       "Prior Rx: Paracetamol 650mg SOS. No known major drug allergies recorded.",
-    agniStatus: "Vishamagni (Irregular digestive capacity)",
+    agniStatus:
+      "Vishamagni (Irregular digestive capacity due to erratic eating habits)",
     aharaVihara:
       "Excessive dry/spicy food consumption, irregular sleep schedule (Ratri Jagarana).",
     urgencyLevel: "Review Soon",
@@ -181,32 +183,34 @@ export default function DoctorDashboard() {
               </div>
             </div>
 
-            {/* Demographics */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-200/60">
-              <div>
-                <p className="text-[10px] text-gray-500 uppercase font-bold">
+            {/* Demographics & Clinical Overview Card (Fixed text wrapping) */}
+            <div className="bg-gray-50 p-4 rounded-xl border border-gray-200/60 space-y-3.5">
+              <div className="border-b border-gray-200 pb-2.5">
+                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
                   Patient Details
                 </p>
-                <p className="font-bold text-gray-900 text-sm truncate">
+                <p className="font-bold text-gray-900 text-sm sm:text-base mt-0.5">
                   {currentPatient.name}
                 </p>
                 <p className="text-xs text-gray-500">
                   {currentPatient.age} yrs • {currentPatient.gender}
                 </p>
               </div>
-              <div>
-                <p className="text-[10px] text-gray-500 uppercase font-bold">
+
+              <div className="border-b border-gray-200 pb-2.5">
+                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
                   Chief Complaint
                 </p>
-                <p className="font-bold text-blue-700 text-sm truncate">
+                <p className="font-bold text-blue-700 text-sm mt-0.5 leading-relaxed break-words">
                   {currentPatient.primaryComplaint}
                 </p>
               </div>
+
               <div>
-                <p className="text-[10px] text-gray-500 uppercase font-bold">
+                <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
                   Differential Diagnosis
                 </p>
-                <p className="font-bold text-gray-800 text-sm truncate">
+                <p className="font-bold text-gray-800 text-sm mt-0.5 leading-relaxed break-words">
                   {currentPatient.possibleDiagnosis}
                 </p>
               </div>
