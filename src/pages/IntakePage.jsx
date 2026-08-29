@@ -38,18 +38,18 @@ export default function IntakePage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4 bg-blue-50">
-      <div className="w-full max-w-md p-8 bg-white shadow-xl rounded-2xl border border-gray-100">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-100 rounded-full text-blue-600">
+    <div className="flex items-center justify-center min-h-screen p-3 sm:p-4 bg-blue-50">
+      <div className="w-full max-w-md p-6 sm:p-8 bg-white shadow-xl rounded-2xl border border-gray-100">
+        <div className="flex justify-between items-center mb-6 gap-2">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="p-2.5 bg-blue-100 rounded-full text-blue-600 flex-shrink-0">
               <Activity size={28} />
             </div>
-            <div>
-              <h1 className="text-2xl font-black text-blue-950 tracking-tight">
+            <div className="truncate">
+              <h1 className="text-xl sm:text-2xl font-black text-blue-950 tracking-tight truncate">
                 MediKiosk
               </h1>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 truncate">
                 Ayush Clinical Intake & Triage
               </p>
             </div>
@@ -57,7 +57,7 @@ export default function IntakePage() {
           <button
             type="button"
             onClick={handleQuickFill}
-            className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded font-semibold transition"
+            className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded font-semibold transition flex-shrink-0"
           >
             ⚡ Demo Fill
           </button>
@@ -84,7 +84,7 @@ export default function IntakePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
                 Age
@@ -158,15 +158,18 @@ export default function IntakePage() {
               id="dpdpConsent"
               checked={hasConsent}
               onChange={(e) => setHasConsent(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer flex-shrink-0"
             />
             <label
               htmlFor="dpdpConsent"
               className="text-[11px] text-gray-600 leading-relaxed cursor-pointer"
             >
-              <span className="font-bold text-gray-800 flex items-center gap-1">
-                <ShieldCheck size={14} className="text-blue-600" /> DPDP Act
-                2023 & ABDM Consent
+              <span className="font-bold text-gray-800 flex items-center gap-1 flex-wrap">
+                <ShieldCheck
+                  size={14}
+                  className="text-blue-600 flex-shrink-0"
+                />{" "}
+                DPDP Act 2023 & ABDM Consent
               </span>
               I consent to automated clinical history intake, medical document
               OCR, and secure PHR transmission to the physician.
