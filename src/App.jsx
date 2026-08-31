@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import IntakePage from "./pages/IntakePage";
 import ChatPage from "./pages/ChatPage";
+import PatientSuccessPage from "./pages/PatientSuccessPage";
 import DoctorDashboard from "./pages/DoctorDashboard";
+import VerifyPage from "./pages/VerifyPage";
 
 function App() {
   return (
@@ -10,7 +12,9 @@ function App() {
         <Routes>
           <Route path="/" element={<IntakePage />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/success" element={<PatientSuccessPage />} />
           <Route path="/doctor" element={<DoctorDashboard />} />
+          <Route path="/verify" element={<VerifyPage />} />
         </Routes>
       </div>
     </BrowserRouter>
