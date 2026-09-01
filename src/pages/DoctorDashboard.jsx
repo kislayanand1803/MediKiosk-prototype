@@ -29,6 +29,8 @@ import {
   FileDown,
   Globe2,
   PieChart as PieIcon,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -51,8 +53,15 @@ export default function DoctorDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(
     sessionStorage.getItem("medikiosk_doc_auth") === "true",
   );
-  const [pin, setPin] = useState("");
+
+  const [doctorId, setDoctorId] = useState("");
+  const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState(false);
+
+  // NEW: Dark mode state and persistence
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem("medikiosk_theme") === "dark";
+  });
 
   const [activeTab, setActiveTab] = useState("queue");
   const [queueFilter, setQueueFilter] = useState("Waiting");
@@ -72,9 +81,23 @@ export default function DoctorDashboard() {
   const [now, setNow] = useState(new Date());
   const [consultationStartTime, setConsultationStartTime] = useState(null);
 
+  // Apply dark class to HTML root
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("medikiosk_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("medikiosk_theme", "light");
+    }
+  }, [isDarkMode]);
+
   const handleLogin = (e) => {
     e.preventDefault();
-    if (pin === "1234") {
+    const validId = import.meta.env.VITE_DOCTOR_ID || "medi-kiosk";
+    const validPass = import.meta.env.VITE_DOCTOR_PASSWORD || "sih2026";
+
+    if (doctorId === validId && password === validPass) {
       setIsAuthenticated(true);
       sessionStorage.setItem("medikiosk_doc_auth", "true");
       setAuthError(false);
@@ -596,42 +619,60 @@ export default function DoctorDashboard() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-2xl border border-gray-100 space-y-6">
+        <div className="max-w-md w-full bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 space-y-6">
           <div className="flex justify-center">
-            <div className="p-4 bg-blue-100 text-blue-600 rounded-full">
+            <div className="p-4 bg-blue-500/20 text-blue-400 rounded-full">
               <Lock size={32} />
             </div>
           </div>
           <div className="text-center space-y-1">
-            <h1 className="text-xl font-black text-gray-900">
+            <h1 className="text-xl font-black text-white">
               Physician Secure Portal
             </h1>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-slate-400">
               Restricted Area • DPDP Act Compliance & Data Protection
             </p>
           </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">
-                Enter Doctor Access PIN (Demo: 1234)
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Doctor ID
+              </label>
+              <input
+                type="text"
+                value={doctorId}
+                onChange={(e) => setDoctorId(e.target.value)}
+                placeholder="e.g. ayurveda"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">
+                Password
               </label>
               <input
                 type="password"
-                maxLength="6"
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                placeholder="••••"
-                className="w-full px-4 py-3 text-center tracking-widest text-lg font-bold border rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium tracking-widest"
               />
             </div>
+
+            <div className="bg-blue-500/10 p-2 rounded-lg border border-blue-500/20 text-[10px] text-blue-300 text-center font-medium">
+              Demo Credentials - ID:{" "}
+              <span className="font-bold text-blue-200">medi-kiosk</span> |
+              Pass: <span className="font-bold text-blue-200">sih2026</span>
+            </div>
+
             {authError && (
-              <p className="text-xs text-red-600 font-semibold text-center">
-                Invalid PIN. Please try again (Use 1234).
+              <p className="text-xs text-red-400 font-semibold text-center animate-pulse">
+                Invalid Doctor ID or Password. Access Denied.
               </p>
             )}
             <button
               type="submit"
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl transition shadow-md"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl transition shadow-md"
             >
               Authenticate & Access Portal
             </button>
@@ -640,7 +681,7 @@ export default function DoctorDashboard() {
           <div className="text-center pt-4 mt-2">
             <button
               onClick={() => navigate("/")}
-              className="text-xs text-gray-500 hover:text-blue-600 font-bold transition flex items-center justify-center gap-1 mx-auto"
+              className="text-xs text-slate-500 hover:text-slate-300 font-bold transition flex items-center justify-center gap-1 mx-auto"
             >
               ← Back to Patient Kiosk Home
             </button>
@@ -651,43 +692,55 @@ export default function DoctorDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 p-3 sm:p-4 md:p-8">
+    <div className="min-h-screen bg-gray-100 dark:bg-slate-950 p-3 sm:p-4 md:p-8 transition-colors duration-200">
       <div className="max-w-6xl mx-auto space-y-4">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 rounded-xl border shadow-sm gap-3">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm gap-3 transition-colors duration-200">
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-gray-900 flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
               <Stethoscope className="text-blue-600 flex-shrink-0" /> MediKiosk
               Physician Portal
             </h1>
-            <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-              <Clock size={12} className="text-blue-600" /> Auto-locks after 5
-              minutes of inactivity.
+            <p className="text-xs text-gray-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">
+              <Clock size={12} className="text-blue-600 dark:text-blue-500" />{" "}
+              Auto-locks after 5 minutes of inactivity.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
+            <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1 transition-colors duration-200">
               <button
                 onClick={() => setActiveTab("queue")}
-                className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${activeTab === "queue" ? "bg-white text-blue-600 shadow-sm" : "text-gray-600"}`}
+                className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${activeTab === "queue" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-600 dark:text-slate-400"}`}
               >
                 Live Queue
               </button>
               <button
                 onClick={() => setActiveTab("analytics")}
-                className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${activeTab === "analytics" ? "bg-white text-blue-600 shadow-sm" : "text-gray-600"}`}
+                className={`text-xs font-bold px-3 py-1.5 rounded-md transition ${activeTab === "analytics" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-600 dark:text-slate-400"}`}
               >
                 Ayush Ministry Analytics
               </button>
             </div>
             <button
               onClick={() => navigate("/")}
-              className="text-blue-600 text-xs hover:underline font-bold bg-blue-50 px-3 py-2 rounded-lg"
+              className="text-blue-600 dark:text-blue-400 text-xs hover:underline font-bold bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg"
             >
               + Kiosk
             </button>
+
+            {/* NEW: Theme Toggle Button */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg transition"
+              title={
+                isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"
+              }
+            >
+              {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+
             <button
               onClick={handleLogout}
-              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition"
+              className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg transition"
               title="Lock Session"
             >
               <LogOut size={16} />
@@ -697,8 +750,8 @@ export default function DoctorDashboard() {
 
         {activeTab === "queue" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 bg-white rounded-xl shadow-sm border flex flex-col lg:h-[780px]">
-              <div className="p-4 border-b space-y-3 bg-slate-50 rounded-t-xl">
+            <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 flex flex-col lg:h-[780px] transition-colors duration-200">
+              <div className="p-4 border-b border-gray-200 dark:border-slate-800 space-y-3 bg-slate-50 dark:bg-slate-800/50 rounded-t-xl transition-colors duration-200">
                 <button
                   onClick={handleCallNextPatient}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-black py-3 rounded-lg shadow-md flex items-center justify-center gap-2 transition active:scale-95"
@@ -707,7 +760,10 @@ export default function DoctorDashboard() {
                 </button>
 
                 <div className="flex items-center gap-2">
-                  <Calendar size={14} className="text-gray-500" />
+                  <Calendar
+                    size={14}
+                    className="text-gray-500 dark:text-slate-400"
+                  />
                   <input
                     type="date"
                     value={selectedDate}
@@ -715,31 +771,31 @@ export default function DoctorDashboard() {
                       setSelectedDate(e.target.value);
                       setSelectedPatient(null);
                     }}
-                    className="w-full bg-white border border-gray-200 text-gray-700 text-xs py-1.5 px-2 rounded-md focus:ring-2 focus:ring-blue-600 outline-none font-bold"
+                    className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-white text-xs py-1.5 px-2 rounded-md focus:ring-2 focus:ring-blue-600 outline-none font-bold"
                   />
                   {selectedDate === new Date().toISOString().split("T")[0] && (
-                    <span className="bg-blue-100 text-blue-800 text-[10px] px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 shrink-0 font-bold">
+                    <span className="bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 text-[10px] px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 shrink-0 font-bold">
                       <BellRing size={10} /> Live
                     </span>
                   )}
                 </div>
 
-                <div className="flex bg-gray-200 p-1 rounded-lg mt-2">
+                <div className="flex bg-gray-200 dark:bg-slate-800 p-1 rounded-lg mt-2 transition-colors duration-200">
                   <button
                     onClick={() => setQueueFilter("Waiting")}
-                    className={`flex-1 text-[10px] sm:text-xs font-bold py-1.5 rounded-md transition ${queueFilter === "Waiting" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500"}`}
+                    className={`flex-1 text-[10px] sm:text-xs font-bold py-1.5 rounded-md transition ${queueFilter === "Waiting" ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm" : "text-gray-500 dark:text-slate-400"}`}
                   >
                     Waiting
                   </button>
                   <button
                     onClick={() => setQueueFilter("In Consultation")}
-                    className={`flex-1 text-[10px] sm:text-xs font-bold py-1.5 rounded-md transition ${queueFilter === "In Consultation" ? "bg-white text-purple-600 shadow-sm" : "text-gray-500"}`}
+                    className={`flex-1 text-[10px] sm:text-xs font-bold py-1.5 rounded-md transition ${queueFilter === "In Consultation" ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm" : "text-gray-500 dark:text-slate-400"}`}
                   >
                     In Consult
                   </button>
                   <button
                     onClick={() => setQueueFilter("Approved")}
-                    className={`flex-1 text-[10px] sm:text-xs font-bold py-1.5 rounded-md transition ${queueFilter === "Approved" ? "bg-white text-green-600 shadow-sm" : "text-gray-500"}`}
+                    className={`flex-1 text-[10px] sm:text-xs font-bold py-1.5 rounded-md transition ${queueFilter === "Approved" ? "bg-white dark:bg-slate-700 text-green-600 dark:text-green-400 shadow-sm" : "text-gray-500 dark:text-slate-400"}`}
                   >
                     Completed
                   </button>
@@ -748,21 +804,21 @@ export default function DoctorDashboard() {
                 <div className="relative">
                   <Search
                     size={14}
-                    className="absolute left-3 top-2.5 text-gray-400"
+                    className="absolute left-3 top-2.5 text-gray-400 dark:text-slate-500"
                   />
                   <input
                     type="text"
                     placeholder="Search name or token..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    className="w-full pl-8 pr-3 py-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-600"
                   />
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 {filteredPatients.length === 0 ? (
-                  <p className="text-center text-xs text-gray-500 mt-10">
+                  <p className="text-center text-xs text-gray-500 dark:text-slate-400 mt-10">
                     No patients found in this category.
                   </p>
                 ) : (
@@ -781,8 +837,8 @@ export default function DoctorDashboard() {
                         }}
                         className={`p-3 border rounded-xl transition cursor-pointer relative overflow-hidden ${
                           active
-                            ? "bg-blue-50 border-blue-400 shadow-sm"
-                            : "bg-white border-gray-200 hover:bg-gray-50"
+                            ? "bg-blue-50 dark:bg-blue-900/20 border-blue-400 dark:border-blue-700 shadow-sm"
+                            : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50"
                         }`}
                       >
                         {pat.is_red_flag && (
@@ -793,16 +849,16 @@ export default function DoctorDashboard() {
                           <div>
                             <div className="flex items-center gap-2">
                               <span
-                                className={`font-black text-xs px-1.5 py-0.5 rounded ${isConsulting ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-800"}`}
+                                className={`font-black text-xs px-1.5 py-0.5 rounded ${isConsulting ? "bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300" : "bg-gray-100 dark:bg-slate-700 text-gray-800 dark:text-slate-300"}`}
                               >
                                 {pat.token_number || "TKN-PENDING"}
                               </span>
-                              <p className="font-bold text-gray-900 text-sm truncate">
+                              <p className="font-bold text-gray-900 dark:text-white text-sm truncate">
                                 {pat.name}
                               </p>
                             </div>
 
-                            <div className="text-[10px] text-gray-500 mt-1.5 space-y-0.5">
+                            <div className="text-[10px] text-gray-500 dark:text-slate-400 mt-1.5 space-y-0.5">
                               <p className="flex items-center gap-1">
                                 <Clock size={10} /> In:{" "}
                                 {formatTime(pat.created_at)}
@@ -811,7 +867,7 @@ export default function DoctorDashboard() {
                                 pat.status !== "In Consultation" &&
                                 selectedDate ===
                                   new Date().toISOString().split("T")[0] && (
-                                  <p className="text-orange-600 font-semibold flex items-center gap-1">
+                                  <p className="text-orange-600 dark:text-orange-400 font-semibold flex items-center gap-1">
                                     <Timer size={10} /> Wait:{" "}
                                     {getDynamicWaitTime(pat.created_at)}
                                   </p>
@@ -833,29 +889,32 @@ export default function DoctorDashboard() {
             </div>
 
             {!selectedPatient ? (
-              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border p-4 sm:p-6 lg:h-[780px] flex flex-col items-center justify-center text-gray-400 bg-gray-50/50">
-                <Stethoscope size={48} className="mb-4 text-gray-300" />
-                <p className="text-lg font-bold text-gray-500">
+              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 lg:h-[780px] flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 bg-gray-50/50 dark:bg-slate-900/50 transition-colors duration-200">
+                <Stethoscope
+                  size={48}
+                  className="mb-4 text-gray-300 dark:text-slate-700"
+                />
+                <p className="text-lg font-bold text-gray-500 dark:text-slate-400">
                   No Patient Selected
                 </p>
-                <p className="text-sm mt-1">
+                <p className="text-sm mt-1 text-center">
                   Select a patient from the queue or change the date to view
                   records.
                 </p>
               </div>
             ) : (
-              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border p-4 sm:p-6 lg:h-[780px] lg:overflow-y-auto space-y-6 relative">
+              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 lg:h-[780px] lg:overflow-y-auto space-y-6 relative transition-colors duration-200">
                 {selectedPatient.is_red_flag && (
-                  <div className="bg-red-50 border border-red-200 p-3 rounded-xl flex items-center gap-3 shadow-sm">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
                     <AlertTriangle
-                      className="text-red-600 flex-shrink-0"
+                      className="text-red-600 dark:text-red-500 flex-shrink-0"
                       size={24}
                     />
                     <div>
-                      <h3 className="text-red-900 font-black text-sm">
+                      <h3 className="text-red-900 dark:text-red-400 font-black text-sm">
                         CRITICAL RED-FLAG ALERT
                       </h3>
-                      <p className="text-red-700 text-xs">
+                      <p className="text-red-700 dark:text-red-300 text-xs">
                         AI flagged acute symptoms. Prioritize physical
                         examination.
                       </p>
@@ -863,25 +922,30 @@ export default function DoctorDashboard() {
                   </div>
                 )}
 
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 gap-3">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 dark:border-slate-800 pb-4 gap-3">
                   <div>
-                    <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
-                      <FileText className="text-blue-600" size={20} /> Clinical
-                      Summary
+                    <h2 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                      <FileText
+                        className="text-blue-600 dark:text-blue-500"
+                        size={20}
+                      />{" "}
+                      Clinical Summary
                     </h2>
                     <div className="flex items-center gap-3 mt-1 text-xs font-bold">
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 dark:text-slate-400">
                         Token: {selectedPatient.token_number || "Pending"}
                       </span>
-                      <span className="text-gray-300">|</span>
+                      <span className="text-gray-300 dark:text-slate-600">
+                        |
+                      </span>
                       {selectedPatient.status === "In Consultation" ? (
-                        <span className="text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/40 px-2 py-0.5 rounded-full flex items-center gap-1">
                           <Timer size={12} className="animate-pulse" /> Active:{" "}
                           {getElapsedConsultationTime()}
                         </span>
                       ) : (
                         <span
-                          className={`px-2 py-0.5 rounded-full ${selectedPatient.status === "Approved" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                          className={`px-2 py-0.5 rounded-full ${selectedPatient.status === "Approved" ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400" : "bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300"}`}
                         >
                           Status: {selectedPatient.status || "Waiting"}
                         </span>
@@ -891,7 +955,7 @@ export default function DoctorDashboard() {
                   <div className="flex flex-wrap gap-2 w-full md:w-auto">
                     <button
                       onClick={handleDownloadReport}
-                      className="flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition"
+                      className="flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg font-bold bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-900/50 transition"
                       title="Download PDF Clinical Report"
                     >
                       <FileDown size={14} /> Print PDF
@@ -899,7 +963,7 @@ export default function DoctorDashboard() {
 
                     <button
                       onClick={() => setShowFhirModal(true)}
-                      className="flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition"
+                      className="flex items-center justify-center gap-1.5 text-xs px-3 py-2 rounded-lg font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-900/50 transition"
                       title="Inspect ABDM FHIR JSON Document"
                     >
                       <Code2 size={14} /> ABDM FHIR
@@ -909,7 +973,7 @@ export default function DoctorDashboard() {
                       onClick={() =>
                         isEditing ? handleSaveNotes() : setIsEditing(true)
                       }
-                      className={`flex items-center justify-center gap-1.5 text-xs px-3.5 py-2 rounded-lg font-bold transition ${isEditing ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+                      className={`flex items-center justify-center gap-1.5 text-xs px-3.5 py-2 rounded-lg font-bold transition ${isEditing ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300" : "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700"}`}
                     >
                       {isEditing ? <Save size={14} /> : <Edit2 size={14} />}{" "}
                       {isEditing ? "Save" : "Edit"}
@@ -917,7 +981,7 @@ export default function DoctorDashboard() {
                     <button
                       onClick={handleApprove}
                       disabled={selectedPatient.status === "Approved"}
-                      className={`flex items-center justify-center gap-1.5 text-xs px-4 py-2 rounded-lg font-bold text-white shadow-sm transition ${selectedPatient.status === "Approved" ? "bg-green-600" : "bg-blue-600 hover:bg-blue-700"}`}
+                      className={`flex items-center justify-center gap-1.5 text-xs px-4 py-2 rounded-lg font-bold text-white shadow-sm transition ${selectedPatient.status === "Approved" ? "bg-green-600 dark:bg-green-700" : "bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"}`}
                     >
                       <Check size={14} />{" "}
                       {selectedPatient.status === "Approved"
@@ -927,8 +991,8 @@ export default function DoctorDashboard() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 mt-4 mb-2">
-                  <span className="font-bold text-slate-700 uppercase tracking-wide">
+                <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 mt-4 mb-2">
+                  <span className="font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                     Data Provenance:
                   </span>
                   <span className="flex items-center gap-1">
@@ -942,104 +1006,106 @@ export default function DoctorDashboard() {
                   </span>
                 </div>
 
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200/60 space-y-3.5">
-                  <div className="border-b border-gray-200 pb-2.5">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                <div className="bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border border-gray-200/60 dark:border-slate-800 space-y-3.5">
+                  <div className="border-b border-gray-200 dark:border-slate-800 pb-2.5">
+                    <p className="text-[10px] text-gray-500 dark:text-slate-400 uppercase font-bold tracking-wider">
                       Patient Details
                     </p>
-                    <p className="font-bold text-gray-900 text-sm sm:text-base mt-0.5">
+                    <p className="font-bold text-gray-900 dark:text-white text-sm sm:text-base mt-0.5">
                       {selectedPatient.name}
                     </p>
                     <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <p className="text-xs text-gray-500 font-medium">
+                      <p className="text-xs text-gray-500 dark:text-slate-400 font-medium">
                         {selectedPatient.age} yrs • {selectedPatient.gender}
                       </p>
-                      <span className="text-gray-300">|</span>
-                      <p className="text-xs text-gray-600 font-bold flex items-center gap-1">
+                      <span className="text-gray-300 dark:text-slate-700">
+                        |
+                      </span>
+                      <p className="text-xs text-gray-600 dark:text-slate-300 font-bold flex items-center gap-1">
                         <Calendar size={12} className="text-blue-500" />{" "}
                         {new Date(
                           selectedPatient.created_at,
                         ).toLocaleDateString()}
                       </p>
-                      <p className="text-xs text-gray-600 font-bold flex items-center gap-1">
+                      <p className="text-xs text-gray-600 dark:text-slate-300 font-bold flex items-center gap-1">
                         <Clock size={12} className="text-blue-500" />{" "}
                         {formatTime(selectedPatient.created_at)}
                       </p>
                     </div>
                   </div>
-                  <div className="border-b border-gray-200 pb-2.5">
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                  <div className="border-b border-gray-200 dark:border-slate-800 pb-2.5">
+                    <p className="text-[10px] text-gray-500 dark:text-slate-400 uppercase font-bold tracking-wider">
                       Chief Complaint
                     </p>
-                    <p className="font-bold text-blue-700 text-sm mt-0.5 leading-relaxed break-words">
+                    <p className="font-bold text-blue-700 dark:text-blue-400 text-sm mt-0.5 leading-relaxed break-words">
                       {selectedPatient.primary_complaint}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                    <p className="text-[10px] text-gray-500 dark:text-slate-400 uppercase font-bold tracking-wider">
                       Differential Diagnosis
                     </p>
-                    <p className="font-bold text-gray-800 text-sm mt-0.5 leading-relaxed break-words">
+                    <p className="font-bold text-gray-800 dark:text-slate-200 text-sm mt-0.5 leading-relaxed break-words">
                       {selectedPatient.possible_diagnosis}
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold uppercase text-gray-500 mb-2 flex items-center gap-1.5">
+                  <h4 className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
                     <Activity size={14} /> Subjective Clinical History
                   </h4>
                   {isEditing ? (
                     <textarea
-                      className="w-full p-3 text-sm text-gray-800 border-2 border-blue-300 rounded-xl outline-none focus:border-blue-600 shadow-inner"
+                      className="w-full p-3 text-sm text-gray-800 dark:text-white bg-white dark:bg-slate-900 border-2 border-blue-300 dark:border-blue-800 rounded-xl outline-none focus:border-blue-600 dark:focus:border-blue-500 shadow-inner"
                       rows="3"
                       value={caseNotes}
                       onChange={(e) => setCaseNotes(e.target.value)}
                     />
                   ) : (
-                    <p className="text-gray-700 text-xs bg-yellow-50/70 p-3.5 rounded-xl border border-yellow-200 leading-relaxed break-words">
+                    <p className="text-gray-700 dark:text-slate-300 text-xs bg-yellow-50/70 dark:bg-yellow-900/10 p-3.5 rounded-xl border border-yellow-200 dark:border-yellow-900/30 leading-relaxed break-words">
                       {caseNotes}
                     </p>
                   )}
                 </div>
 
-                <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                  <h4 className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                <div className="bg-slate-50 dark:bg-slate-800/30 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
                     <FileSearch
                       size={14}
-                      className="text-blue-600 flex-shrink-0"
+                      className="text-blue-600 dark:text-blue-500 flex-shrink-0"
                     />{" "}
                     Digitized Prior Records / Lab OCR
                   </h4>
-                  <p className="text-xs text-slate-600 break-words">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 break-words">
                     {selectedPatient.extracted_doc_notes ||
                       "No prior records attached during this session."}
                   </p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200">
-                    <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                  <div className="bg-amber-50/60 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-200 dark:border-amber-900/30">
+                    <span className="text-[11px] font-bold text-amber-900 dark:text-amber-500 flex items-center gap-1">
                       <Flame size={14} className="flex-shrink-0" /> Agni
                       Pariksha (Digestive Fire)
                     </span>
-                    <p className="text-xs text-amber-800 mt-1 break-words">
+                    <p className="text-xs text-amber-800 dark:text-amber-200 mt-1 break-words">
                       {selectedPatient.agni_status || "Samagni"}
                     </p>
                   </div>
-                  <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-200">
-                    <span className="text-[11px] font-bold text-emerald-900 flex items-center gap-1">
+                  <div className="bg-emerald-50/60 dark:bg-emerald-900/10 p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/30">
+                    <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-500 flex items-center gap-1">
                       <Apple size={14} className="flex-shrink-0" /> Ahara-Vihara
                       (Diet & Lifestyle)
                     </span>
-                    <p className="text-xs text-emerald-800 mt-1 break-words">
+                    <p className="text-xs text-emerald-800 dark:text-emerald-200 mt-1 break-words">
                       {selectedPatient.ahara_vihara || "Balanced routine"}
                     </p>
                   </div>
                 </div>
 
-                <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-100">
-                  <h4 className="text-xs font-bold uppercase text-gray-700 mb-3">
+                <div className="bg-blue-50/40 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                  <h4 className="text-xs font-bold uppercase text-gray-700 dark:text-slate-300 mb-3">
                     Ayurvedic Vikriti Triaging (Dosha Imbalance)
                   </h4>
                   <div className="flex flex-col md:flex-row items-center gap-4">
@@ -1051,11 +1117,13 @@ export default function DoctorDashboard() {
                           outerRadius="65%"
                           data={selectedPatient.dosha_data}
                         >
-                          <PolarGrid stroke="#e5e7eb" />
+                          <PolarGrid
+                            stroke={isDarkMode ? "#334155" : "#e5e7eb"}
+                          />
                           <PolarAngleAxis
                             dataKey="subject"
                             tick={{
-                              fill: "#374151",
+                              fill: isDarkMode ? "#cbd5e1" : "#374151",
                               fontSize: 11,
                               fontWeight: 700,
                             }}
@@ -1085,28 +1153,28 @@ export default function DoctorDashboard() {
                         return (
                           <div
                             key={item.subject}
-                            className="bg-white p-2 rounded-lg border border-gray-200 shadow-sm"
+                            className="bg-white dark:bg-slate-800 p-2 rounded-lg border border-gray-200 dark:border-slate-700 shadow-sm"
                           >
                             <div className="flex justify-between items-center text-xs mb-1">
-                              <span className="font-bold text-gray-800">
+                              <span className="font-bold text-gray-800 dark:text-slate-200">
                                 {item.subject}{" "}
-                                <span className="text-[10px] text-gray-400 font-normal">
+                                <span className="text-[10px] text-gray-400 dark:text-slate-500 font-normal">
                                   {info.subtitle}
                                 </span>
                               </span>
-                              <span className="font-bold text-gray-600">
+                              <span className="font-bold text-gray-600 dark:text-slate-400">
                                 {item.value}%
                               </span>
                             </div>
-                            <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1">
+                            <div className="w-full h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
                               <div
                                 className={`h-full rounded-full ${info.colorClass}`}
                                 style={{ width: `${item.value}%` }}
                               />
                             </div>
-                            <p className="text-[10px] text-gray-500 italic break-words">
+                            <p className="text-[10px] text-gray-500 dark:text-slate-400 italic break-words">
                               💡{" "}
-                              <strong className="text-gray-700">
+                              <strong className="text-gray-700 dark:text-slate-300">
                                 {info.desc.split("(")[0]}
                               </strong>
                               ({info.desc.split("(")[1]}
@@ -1125,115 +1193,126 @@ export default function DoctorDashboard() {
         {activeTab === "analytics" && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-5 rounded-xl border shadow-sm space-y-1">
-                <div className="flex justify-between items-center text-gray-500">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-1 transition-colors duration-200">
+                <div className="flex justify-between items-center text-gray-500 dark:text-slate-400">
                   <span className="text-xs font-bold uppercase">
                     Total Footfall
                   </span>
-                  <Users size={18} className="text-blue-600" />
+                  <Users
+                    size={18}
+                    className="text-blue-600 dark:text-blue-500"
+                  />
                 </div>
-                <p className="text-2xl font-black text-gray-900">
+                <p className="text-2xl font-black text-gray-900 dark:text-white">
                   {totalFootfall}
                 </p>
-                <p className="text-[10px] text-green-600 font-semibold flex items-center gap-1">
+                <p className="text-[10px] text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
                   <TrendingUp size={12} /> Active kiosk sessions recorded
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-xl border shadow-sm space-y-1">
-                <div className="flex justify-between items-center text-gray-500">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-1 transition-colors duration-200">
+                <div className="flex justify-between items-center text-gray-500 dark:text-slate-400">
                   <span className="text-xs font-bold uppercase">
                     Approved Cases
                   </span>
-                  <Check size={18} className="text-green-600" />
+                  <Check
+                    size={18}
+                    className="text-green-600 dark:text-green-500"
+                  />
                 </div>
-                <p className="text-2xl font-black text-gray-900">
+                <p className="text-2xl font-black text-gray-900 dark:text-white">
                   {approvedCount}
                 </p>
-                <p className="text-[10px] text-gray-500">
+                <p className="text-[10px] text-gray-500 dark:text-slate-400">
                   {totalFootfall
                     ? Math.round((approvedCount / totalFootfall) * 100)
                     : 0}
                   % clearance rate
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-xl border shadow-sm space-y-1">
-                <div className="flex justify-between items-center text-gray-500">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-1 transition-colors duration-200">
+                <div className="flex justify-between items-center text-gray-500 dark:text-slate-400">
                   <span className="text-xs font-bold uppercase">
                     Red-Flag Alerts
                   </span>
-                  <AlertTriangle size={18} className="text-red-600" />
+                  <AlertTriangle
+                    size={18}
+                    className="text-red-600 dark:text-red-500"
+                  />
                 </div>
-                <p className="text-2xl font-black text-gray-900">
+                <p className="text-2xl font-black text-gray-900 dark:text-white">
                   {redFlagCount}
                 </p>
-                <p className="text-[10px] text-red-600 font-semibold">
+                <p className="text-[10px] text-red-600 dark:text-red-400 font-semibold">
                   Immediate triage priority
                 </p>
               </div>
-              <div className="bg-white p-5 rounded-xl border shadow-sm space-y-1">
-                <div className="flex justify-between items-center text-gray-500">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-1 transition-colors duration-200">
+                <div className="flex justify-between items-center text-gray-500 dark:text-slate-400">
                   <span className="text-xs font-bold uppercase">
                     ABHA / ABDM Linked
                   </span>
-                  <ShieldCheck size={18} className="text-blue-600" />
+                  <ShieldCheck
+                    size={18}
+                    className="text-blue-600 dark:text-blue-500"
+                  />
                 </div>
-                <p className="text-2xl font-black text-gray-900">
+                <p className="text-2xl font-black text-gray-900 dark:text-white">
                   {abhaLinkedCount}
                 </p>
-                <p className="text-[10px] text-blue-600 font-semibold">
+                <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold">
                   National Health Locker sync
                 </p>
               </div>
             </div>
 
-            {/* ENHANCED ANALYTICS SECTION: Added Ministry Telemetry breakdown */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-white p-4 rounded-xl border shadow-sm flex items-center gap-3">
-                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-colors duration-200">
+                <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
                   <Globe2 size={24} />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase font-bold">
                     Multilingual Kiosk Reach
                   </p>
-                  <p className="text-base font-black text-gray-800">
+                  <p className="text-base font-black text-gray-800 dark:text-white">
                     7 Regional Languages
                   </p>
-                  <p className="text-[10px] text-indigo-600 font-semibold">
+                  <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-semibold">
                     Active voice & OCR support
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-xl border shadow-sm flex items-center gap-3">
-                <div className="p-3 bg-purple-50 text-purple-600 rounded-lg">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-colors duration-200">
+                <div className="p-3 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
                   <Timer size={24} />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase font-bold">
                     Avg Triage Duration
                   </p>
-                  <p className="text-base font-black text-gray-800">
+                  <p className="text-base font-black text-gray-800 dark:text-white">
                     1.8 Minutes
                   </p>
-                  <p className="text-[10px] text-purple-600 font-semibold">
+                  <p className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">
                     Dashavidha Pariksha speedup
                   </p>
                 </div>
               </div>
 
-              <div className="bg-white p-4 rounded-xl border shadow-sm flex items-center gap-3">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-colors duration-200">
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
                   <PieIcon size={24} />
                 </div>
                 <div>
                   <p className="text-[10px] text-gray-400 uppercase font-bold">
                     Interoperability Standard
                   </p>
-                  <p className="text-base font-black text-gray-800">
+                  <p className="text-base font-black text-gray-800 dark:text-white">
                     ABDM FHIR R4
                   </p>
-                  <p className="text-[10px] text-emerald-600 font-semibold">
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
                     NRCeS health vault compliant
                   </p>
                 </div>
@@ -1241,17 +1320,20 @@ export default function DoctorDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-4 transition-colors duration-200">
                 <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
-                    <BarChart3 size={18} className="text-blue-600" /> National
-                    Ayush Dosha Trends (Vikriti)
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
+                    <BarChart3
+                      size={18}
+                      className="text-blue-600 dark:text-blue-500"
+                    />{" "}
+                    National Ayush Dosha Trends (Vikriti)
                   </h3>
-                  <span className="text-[10px] bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full font-bold">
+                  <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2.5 py-1 rounded-full font-bold">
                     Live Telemetry
                   </span>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 dark:text-slate-400">
                   Aggregated imbalance percentage across all active kiosk
                   consultations in the database.
                 </p>
@@ -1260,10 +1342,23 @@ export default function DoctorDashboard() {
                     <BarChart data={doshaBarData}>
                       <XAxis
                         dataKey="name"
-                        tick={{ fontSize: 11, fontWeight: 700 }}
+                        tick={{
+                          fill: isDarkMode ? "#cbd5e1" : "#374151",
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
                       />
-                      <YAxis domain={[0, 100]} />
-                      <Tooltip />
+                      <YAxis
+                        domain={[0, 100]}
+                        tick={{ fill: isDarkMode ? "#cbd5e1" : "#374151" }}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: isDarkMode ? "#1e293b" : "#fff",
+                          borderColor: isDarkMode ? "#334155" : "#e5e7eb",
+                          color: isDarkMode ? "#fff" : "#000",
+                        }}
+                      />
                       <Bar
                         dataKey="value"
                         fill="#2563eb"
@@ -1274,48 +1369,54 @@ export default function DoctorDashboard() {
                 </div>
               </div>
 
-              <div className="bg-white p-6 rounded-xl border shadow-sm space-y-4 flex flex-col justify-between">
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-4 flex flex-col justify-between transition-colors duration-200">
                 <div className="space-y-3">
-                  <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
-                    <ShieldCheck size={18} className="text-emerald-600" />{" "}
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
+                    <ShieldCheck
+                      size={18}
+                      className="text-emerald-600 dark:text-emerald-500"
+                    />{" "}
                     Ministry of Ayush Compliance & Interoperability
                   </h3>
-                  <p className="text-xs text-gray-600 leading-relaxed">
+                  <p className="text-xs text-gray-600 dark:text-slate-400 leading-relaxed">
                     This MediKiosk platform strictly adheres to the Ministry of
                     Ayush digital health standards, integrating Dashavidha
                     Pariksha metrics with standard electronic health records
                     (EHR).
                   </p>
                   <div className="space-y-2 pt-2">
-                    <div className="flex justify-between text-xs p-2.5 bg-gray-50 rounded-lg border">
-                      <span className="font-bold text-gray-700">
+                    <div className="flex justify-between text-xs p-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                      <span className="font-bold text-gray-700 dark:text-slate-300">
                         DPDP Act 2023 Consent Audit
                       </span>
-                      <span className="text-green-600 font-bold">
+                      <span className="text-green-600 dark:text-green-400 font-bold">
                         100% Compliant
                       </span>
                     </div>
-                    <div className="flex justify-between text-xs p-2.5 bg-gray-50 rounded-lg border">
-                      <span className="font-bold text-gray-700">
+                    <div className="flex justify-between text-xs p-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                      <span className="font-bold text-gray-700 dark:text-slate-300">
                         ABDM Health Locker Protocol
                       </span>
-                      <span className="text-blue-600 font-bold">
+                      <span className="text-blue-600 dark:text-blue-400 font-bold">
                         Active API Hook
                       </span>
                     </div>
-                    <div className="flex justify-between text-xs p-2.5 bg-gray-50 rounded-lg border">
-                      <span className="font-bold text-gray-700">
+                    <div className="flex justify-between text-xs p-2.5 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700">
+                      <span className="font-bold text-gray-700 dark:text-slate-300">
                         AI Triage Model
                       </span>
-                      <span className="text-purple-600 font-bold">
+                      <span className="text-purple-600 dark:text-purple-400 font-bold">
                         Google Gemini 3.5 Flash
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="bg-blue-50 p-3.5 rounded-xl border border-blue-100 flex items-center gap-3">
-                  <Activity size={20} className="text-blue-600 flex-shrink-0" />
-                  <p className="text-[11px] text-blue-900 font-medium">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-3.5 rounded-xl border border-blue-100 dark:border-blue-900/50 flex items-center gap-3">
+                  <Activity
+                    size={20}
+                    className="text-blue-600 dark:text-blue-400 flex-shrink-0"
+                  />
+                  <p className="text-[11px] text-blue-900 dark:text-blue-300 font-medium">
                     National health data is encrypted at rest via Supabase
                     PostgreSQL secure schemas.
                   </p>
