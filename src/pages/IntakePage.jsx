@@ -7,15 +7,21 @@ import {
   Users,
   ShieldCheck,
   CreditCard,
+  Stethoscope,
+  Globe,
 } from "lucide-react";
+import { LANGUAGES, getT } from "../utils/translations";
 
 export default function IntakePage() {
   const navigate = useNavigate();
+  const [appLanguage, setAppLanguage] = useState("en");
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
   const [abhaId, setAbhaId] = useState("");
   const [hasConsent, setHasConsent] = useState(false);
+
+  const t = getT(appLanguage);
 
   const handleQuickFill = () => {
     setName("Rahul Sharma");
@@ -28,18 +34,33 @@ export default function IntakePage() {
   const startConsultation = (e) => {
     e.preventDefault();
     if (!hasConsent) {
-      alert(
-        "Please grant DPDP Act consent to proceed with AI clinical history recording.",
-      );
+      alert(t.alert);
       return;
     }
     const patientInfo = { name, age, gender, abhaId };
-    navigate("/chat", { state: { patientInfo } });
+    navigate("/chat", { state: { patientInfo, appLanguage } });
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-3 sm:p-4 bg-blue-50">
-      <div className="w-full max-w-md p-6 sm:p-8 bg-white shadow-xl rounded-2xl border border-gray-100">
+    <div className="flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 bg-blue-50 relative">
+      <div className="absolute top-4 right-4">
+        <div className="relative flex items-center bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-blue-50 transition px-3 py-1.5 cursor-pointer">
+          <Globe size={16} className="text-blue-700 mr-2" />
+          <select
+            value={appLanguage}
+            onChange={(e) => setAppLanguage(e.target.value)}
+            className="bg-transparent text-blue-700 text-xs font-bold outline-none cursor-pointer appearance-none pr-4"
+          >
+            {LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="w-full max-w-md p-6 sm:p-8 bg-white shadow-xl rounded-2xl border border-gray-100 mt-10 sm:mt-0">
         <div className="flex justify-between items-center mb-6 gap-2">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="p-2.5 bg-blue-100 rounded-full text-blue-600 flex-shrink-0">
@@ -47,11 +68,9 @@ export default function IntakePage() {
             </div>
             <div className="truncate">
               <h1 className="text-xl sm:text-2xl font-black text-blue-950 tracking-tight truncate">
-                MediKiosk
+                {t.title}
               </h1>
-              <p className="text-xs text-gray-500 truncate">
-                Ayush Clinical Intake & Triage
-              </p>
+              <p className="text-xs text-gray-500 truncate">{t.subtitle}</p>
             </div>
           </div>
           <button
@@ -59,14 +78,14 @@ export default function IntakePage() {
             onClick={handleQuickFill}
             className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded font-semibold transition flex-shrink-0"
           >
-            ⚡ Demo Fill
+            {t.demo}
           </button>
         </div>
 
         <form onSubmit={startConsultation} className="space-y-4">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-              Full Name
+              {t.name}
             </label>
             <div className="relative">
               <User
@@ -77,7 +96,7 @@ export default function IntakePage() {
                 type="text"
                 required
                 className="w-full pl-10 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
-                placeholder="e.g. Rahul Sharma"
+                placeholder={t.nameP}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
@@ -87,7 +106,7 @@ export default function IntakePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-                Age
+                {t.age}
               </label>
               <div className="relative">
                 <Calendar
@@ -100,7 +119,7 @@ export default function IntakePage() {
                   min="1"
                   max="120"
                   className="w-full pl-10 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
-                  placeholder="e.g. 28"
+                  placeholder={t.ageP}
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
                 />
@@ -109,7 +128,7 @@ export default function IntakePage() {
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-                Gender
+                {t.gender}
               </label>
               <div className="relative">
                 <Users
@@ -123,11 +142,11 @@ export default function IntakePage() {
                   onChange={(e) => setGender(e.target.value)}
                 >
                   <option value="" disabled>
-                    Select...
+                    {t.select}
                   </option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
+                  <option value="Male">{t.male}</option>
+                  <option value="Female">{t.female}</option>
+                  <option value="Other">{t.other}</option>
                 </select>
               </div>
             </div>
@@ -135,7 +154,7 @@ export default function IntakePage() {
 
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
-              ABHA Number (Optional / ABDM Locker)
+              {t.abha}
             </label>
             <div className="relative">
               <CreditCard
@@ -145,7 +164,7 @@ export default function IntakePage() {
               <input
                 type="text"
                 className="w-full pl-10 pr-4 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-600 outline-none"
-                placeholder="e.g. 91-XXXX-XXXX-XXXX"
+                placeholder={t.abhaP}
                 value={abhaId}
                 onChange={(e) => setAbhaId(e.target.value)}
               />
@@ -171,8 +190,7 @@ export default function IntakePage() {
                 />{" "}
                 DPDP Act 2023 & ABDM Consent
               </span>
-              I consent to automated clinical history intake, medical document
-              OCR, and secure PHR transmission to the physician.
+              {t.consent}
             </label>
           </div>
 
@@ -180,9 +198,19 @@ export default function IntakePage() {
             type="submit"
             className="w-full py-3 mt-4 text-white font-bold text-sm bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-md shadow-blue-600/20"
           >
-            Begin Clinical Consultation ➔
+            {t.btn}
           </button>
         </form>
+
+        <div className="mt-5 pt-4 border-t border-gray-100 text-center">
+          <button
+            type="button"
+            onClick={() => navigate("/doctor")}
+            className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition shadow-sm flex items-center justify-center gap-2"
+          >
+            <Stethoscope size={15} className="text-blue-400" /> {t.docBtn}
+          </button>
+        </div>
       </div>
     </div>
   );
