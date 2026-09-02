@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import IntakePage from "./pages/IntakePage";
 import ChatPage from "./pages/ChatPage";
 import PatientSuccessPage from "./pages/PatientSuccessPage";
@@ -17,6 +18,7 @@ function App() {
           <Route path="/verify" element={<VerifyPage />} />
         </Routes>
       </div>
+      <SpeedInsights />
     </BrowserRouter>
   );
 }
