@@ -184,7 +184,9 @@ export default function ChatPage() {
   const [availableVoices, setAvailableVoices] = useState([]);
 
   const messagesEndRef = useRef(null);
-  const TOTAL_STEPS = 4;
+
+  // INCREASED TOTAL STEPS: Accommodates 5 AI questions + 1 Final message step
+  const TOTAL_STEPS = 7;
 
   useEffect(() => {
     const loadVoices = () => {
@@ -482,7 +484,7 @@ export default function ChatPage() {
           </div>
         )}
 
-        {step >= 3 && !isAiThinking && (
+        {step >= 5 && !isAiThinking && (
           <div className="bg-white p-3.5 rounded-xl border border-blue-200 shadow-sm space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5 flex-wrap">
@@ -525,7 +527,7 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
 
         {step === TOTAL_STEPS && !isAiThinking && (
-          <div className="flex justify-center mt-4">
+          <div className="flex justify-center mt-4 mb-2">
             <button
               onClick={handleFinishAndAnalyze}
               disabled={isAnalyzing}
@@ -591,6 +593,11 @@ export default function ChatPage() {
             <Send size={18} />
           </button>
         </form>
+        {/* ADDED DISCLAIMER SAFETY NET */}
+        <div className="text-center pb-2 pt-1 px-4 text-[10px] text-gray-500 italic bg-white">
+          ⚠️ This AI is for triage data collection only and is not providing a
+          medical diagnosis. Please consult your examining physician.
+        </div>
       </div>
     </div>
   );

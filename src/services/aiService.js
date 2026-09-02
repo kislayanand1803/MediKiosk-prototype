@@ -192,7 +192,7 @@ ${languageInstruction}`,
     }
 
     const config = {
-      temperature: 0.1,
+      temperature: 0.1, // STRICT & DETERMINISTIC FOR ACCURATE SUMMARIES
       systemInstruction:
         "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician for the Ministry of Ayush. Distinguish patient-reported facts from AI inferences. Return strictly structured JSON.",
       responseMimeType: "application/json",
@@ -339,13 +339,26 @@ export async function generateNextChatResponse(
       .join("\n");
 
     let clinicalDirective = "";
-    if (step === 1) {
-      clinicalDirective = `PHASE 1: History of Present Illness (HPI). Use the SOCRATES medical framework. 
-      Based on the patient's chief complaint, ask exactly ONE logical follow-up question. 
-      DO NOT repeat any question already asked. Move the diagnosis forward.`;
-    } else if (step === 2) {
-      clinicalDirective = `PHASE 2: Ayush Dashavidha Pariksha. 
-      Ask exactly ONE targeted question about their systemic health. Focus specifically on Digestion (Agni), Bowel Movements (Koshtha), or Sleep (Nidra).`;
+
+    // NEW DYNAMIC 5-PHASE AYURVEDIC QUESTIONING SYSTEM
+    switch (step) {
+      case 1:
+        clinicalDirective = `PHASE 1: General Health & History. Use the SOCRATES framework. Respond with brief empathy, then ask exactly ONE logical follow-up question to narrow down the chief complaint.`;
+        break;
+      case 2:
+        clinicalDirective = `PHASE 2: Digestion & Elimination. Respond with brief empathy. Ask exactly ONE targeted question about appetite, bloating, acidity, or bowel movements (stools/urine).`;
+        break;
+      case 3:
+        clinicalDirective = `PHASE 3: Sleep & Energy. Ask exactly ONE targeted question about their sleep quality, insomnia, or daily energy levels.`;
+        break;
+      case 4:
+        clinicalDirective = `PHASE 4: Lifestyle & Routine. Ask exactly ONE targeted question about their daily routine, stress management, or habits (exercise, addictions).`;
+        break;
+      case 5:
+        clinicalDirective = `PHASE 5: Diet & Preferences. Ask exactly ONE targeted question about their dietary habits, meal frequency, or specific foods that worsen/relieve symptoms.`;
+        break;
+      default:
+        clinicalDirective = `Ask ONE relevant follow-up question to clarify any missing details.`;
     }
 
     const langInstruction = `CRITICAL LANGUAGE REQUIREMENT: You MUST write both your generated clinical question and all 3 quick-reply options entirely in fluent ${language} script and vocabulary. Do not mix in English unless it is an unavoidable technical word.`;
@@ -361,7 +374,7 @@ export async function generateNextChatResponse(
     ${historyText}`;
 
     const config = {
-      temperature: 0.2,
+      temperature: 0.4, // PATIENT-FACING: Higher temp for empathy and adaptability
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
