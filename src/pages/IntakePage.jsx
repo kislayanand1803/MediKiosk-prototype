@@ -24,9 +24,9 @@ export default function IntakePage() {
   const t = getT(appLanguage);
 
   const handleQuickFill = () => {
-    setName("Rahul Sharma");
-    setAge("28");
-    setGender("Male");
+    setName("Nahar Singh Negi");
+    setAge("21");
+    setGender("Female");
     setAbhaId("91-4582-1923-8821");
     setHasConsent(true);
   };

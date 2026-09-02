@@ -58,7 +58,6 @@ export default function DoctorDashboard() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState(false);
 
-  // NEW: Dark mode state and persistence
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem("medikiosk_theme") === "dark";
   });
@@ -81,7 +80,6 @@ export default function DoctorDashboard() {
   const [now, setNow] = useState(new Date());
   const [consultationStartTime, setConsultationStartTime] = useState(null);
 
-  // Apply dark class to HTML root
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
@@ -141,8 +139,9 @@ export default function DoctorDashboard() {
 
     const { data, error } = await supabase
       .from("patients")
+      // UPDATED QUERY: Included koshtha_status
       .select(
-        "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, urgency_level, primary_complaint, possible_diagnosis, agni_status, ahara_vihara, dosha_data",
+        "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, urgency_level, primary_complaint, possible_diagnosis, agni_status, koshtha_status, ahara_vihara, dosha_data",
       )
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
@@ -290,6 +289,7 @@ export default function DoctorDashboard() {
             .section { margin-bottom: 25px; }
             .section-title { font-size: 14px; font-weight: 800; color: #2563eb; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 0.5px; }
             .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+            .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
             .label { font-weight: bold; color: #6b7280; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
             .value { font-size: 14px; margin-top: 2px; font-weight: 500; }
             .full-width { grid-column: span 2; }
@@ -328,8 +328,9 @@ export default function DoctorDashboard() {
 
           <div class="section">
             <div class="section-title">Ayurvedic Dashavidha Pariksha</div>
-            <div class="grid" style="margin-bottom: 15px;">
-              <div><div class="label">Agni Status (Digestive Fire)</div><div class="value">${cleanProvenanceEmoji(selectedPatient.agni_status)}</div></div>
+            <div class="grid-3" style="margin-bottom: 15px;">
+              <div><div class="label">Agni (Digestive Fire)</div><div class="value">${cleanProvenanceEmoji(selectedPatient.agni_status)}</div></div>
+              <div><div class="label">Koshtha (Bowel Habit)</div><div class="value">${cleanProvenanceEmoji(selectedPatient.koshtha_status) || "Madhyama Koshtha"}</div></div>
               <div><div class="label">Ahara-Vihara (Diet & Lifestyle)</div><div class="value">${cleanProvenanceEmoji(selectedPatient.ahara_vihara)}</div></div>
             </div>
             <table>
@@ -727,7 +728,6 @@ export default function DoctorDashboard() {
               + Kiosk
             </button>
 
-            {/* NEW: Theme Toggle Button */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg transition"
@@ -1083,7 +1083,8 @@ export default function DoctorDashboard() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* UPDATED: 3-Column Layout for Koshtha Pariksha */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="bg-amber-50/60 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-200 dark:border-amber-900/30">
                     <span className="text-[11px] font-bold text-amber-900 dark:text-amber-500 flex items-center gap-1">
                       <Flame size={14} className="flex-shrink-0" /> Agni
@@ -1091,6 +1092,15 @@ export default function DoctorDashboard() {
                     </span>
                     <p className="text-xs text-amber-800 dark:text-amber-200 mt-1 break-words">
                       {selectedPatient.agni_status || "Samagni"}
+                    </p>
+                  </div>
+                  <div className="bg-indigo-50/60 dark:bg-indigo-900/10 p-3 rounded-xl border border-indigo-200 dark:border-indigo-900/30">
+                    <span className="text-[11px] font-bold text-indigo-900 dark:text-indigo-400 flex items-center gap-1">
+                      <Activity size={14} className="flex-shrink-0" /> Koshtha
+                      (Bowel Habit)
+                    </span>
+                    <p className="text-xs text-indigo-800 dark:text-indigo-200 mt-1 break-words">
+                      {selectedPatient.koshtha_status || "Madhyama Koshtha"}
                     </p>
                   </div>
                   <div className="bg-emerald-50/60 dark:bg-emerald-900/10 p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/30">

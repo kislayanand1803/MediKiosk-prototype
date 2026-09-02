@@ -4,7 +4,6 @@ import { supabase } from "./supabaseClient";
 // ---------------------------------------------------------
 // MODEL FALLBACK CHAIN
 // ---------------------------------------------------------
-// Safest exact string IDs based on your available tier
 const MODEL_FALLBACK_CHAIN = [
   "gemini-3-flash",
   "gemini-2.5-flash",
@@ -12,7 +11,6 @@ const MODEL_FALLBACK_CHAIN = [
   "gemini-3.5-flash-lite",
 ];
 
-// Helper wrapper to execute AI calls with automatic model fallback
 async function executeWithModelFallback(aiClient, promptParts, config) {
   let lastError = null;
 
@@ -100,7 +98,6 @@ const RED_FLAG_PATTERNS = {
 function deterministicRedFlagCheck(chatHistory) {
   let combinedText = "";
 
-  // FIX: Safely handle both Arrays and Strings to prevent .map() crashes
   if (Array.isArray(chatHistory)) {
     combinedText = chatHistory
       .map((m) => (m.text ? m.text.toLowerCase() : ""))
@@ -122,7 +119,7 @@ function deterministicRedFlagCheck(chatHistory) {
 }
 
 // ---------------------------------------------------------
-// CORE AI ENGINE
+// CORE AI ENGINE (CLINICAL & AYUSH TRIAGE)
 // ---------------------------------------------------------
 export async function generateMedicalCaseSummary(
   patientInfo,
@@ -143,10 +140,9 @@ export async function generateMedicalCaseSummary(
     CRITICAL DATA PROVENANCE: 
     Prepend the exact emoji to the beginning of the text fields (chiefComplaint, symptomsSummary, possibleDiagnosis, extractedDocNotes) based on the source:
     - 🗣️ If the patient explicitly said it in the chat.
-    - 📄 If you read it from an uploaded prescription/lab report.
+    - 📄 If you read it from an uploaded prescription/lab report/imaging OCR.
     - 🤖 If you deduced it medically but it wasn't explicitly stated.`;
 
-    // FIX: Format chatHistory correctly for the prompt whether it's a string or array
     const formattedTranscript =
       typeof chatHistory === "string"
         ? chatHistory
@@ -165,7 +161,23 @@ Analyze the following patient-AI Ayush Prashna Pariksha transcript and any attac
 Consultation Transcript:
 ${formattedTranscript}
 
-Extract chief complaint, clinical history, preliminary diagnosis, red-flag status, and Ayurvedic Pariksha assessment. ${languageInstruction}`,
+CRITICAL CLINICAL & AYUSH TRIAGING DIRECTIVES:
+1. VIKRITI (DOSHA IMBALANCE) SCORING:
+   - vataScore, pittaScore, and kaphaScore MUST be integers between 0 and 100 representing current pathological imbalance.
+   - Normal baseline: 15-30%
+   - Moderate aggravation: 45-65%
+   - Acute / severe pathological aggravation (e.g. sharp pain, abscess, severe constipation, inflammation): 70-95%
+   - DO NOT provide single-digit numbers (like 7 or 8) for active symptoms.
+
+2. AYUSH CLINICAL PARIKSHA:
+   - Identify Agni status: Vishamagni (irregular), Tikshnagni (hyperactive), Mandagni (sluggish), or Samagni (balanced).
+   - Identify Koshtha status: Krura Koshtha (hard/constipated bowels), Mridu Koshtha (loose/fast bowels), or Madhyama Koshtha (regular bowels).
+   - Provide Ahara-Vihara (dietary and lifestyle) guidance.
+
+3. ACUTE OCR & SURGICAL RED-FLAG OVERRIDE:
+   - If the attached document image or OCR shows acute structural/pathological findings (such as hepatic abscess, internal organ inflammation, hemangioma risks, perforation, acute abdomen, or sepsis), you MUST set isRedFlag to true and urgencyLevel to "Urgent".
+
+${languageInstruction}`,
       },
     ];
 
@@ -182,7 +194,7 @@ Extract chief complaint, clinical history, preliminary diagnosis, red-flag statu
     const config = {
       temperature: 0.1,
       systemInstruction:
-        "You are an expert clinical triage assistant and Ayurvedic diagnostician for the Ministry of Ayush. Return strictly structured JSON.",
+        "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician for the Ministry of Ayush. Distinguish patient-reported facts from AI inferences. Return strictly structured JSON.",
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -192,6 +204,7 @@ Extract chief complaint, clinical history, preliminary diagnosis, red-flag statu
           possibleDiagnosis: { type: Type.STRING },
           extractedDocNotes: { type: Type.STRING },
           agniStatus: { type: Type.STRING },
+          koshthaStatus: { type: Type.STRING },
           aharaVihara: { type: Type.STRING },
           vataScore: { type: Type.INTEGER },
           pittaScore: { type: Type.INTEGER },
@@ -208,6 +221,7 @@ Extract chief complaint, clinical history, preliminary diagnosis, red-flag statu
           "possibleDiagnosis",
           "extractedDocNotes",
           "agniStatus",
+          "koshthaStatus",
           "aharaVihara",
           "vataScore",
           "pittaScore",
@@ -220,7 +234,6 @@ Extract chief complaint, clinical history, preliminary diagnosis, red-flag statu
 
     const response = await executeWithModelFallback(ai, parts, config);
 
-    // FIX: Safely clean the response text before parsing in case the AI wrapped it in Markdown
     let cleanText = response.text || "{}";
     cleanText = cleanText
       .replace(/```json/gi, "")
@@ -247,6 +260,7 @@ Extract chief complaint, clinical history, preliminary diagnosis, red-flag statu
       possible_diagnosis: parsedData.possibleDiagnosis,
       extracted_doc_notes: parsedData.extractedDocNotes,
       agni_status: parsedData.agniStatus,
+      koshtha_status: parsedData.koshthaStatus,
       ahara_vihara: parsedData.aharaVihara,
       urgency_level: finalUrgency,
       is_red_flag: finalIsRedFlag,
@@ -285,6 +299,7 @@ Extract chief complaint, clinical history, preliminary diagnosis, red-flag statu
       possible_diagnosis: "🤖 Vata-Pitta Shiroroga / Migraine",
       extracted_doc_notes: "📄 Prior prescription OCR: Paracetamol 650mg SOS.",
       agni_status: "Vishamagni (Irregular digestion)",
+      koshtha_status: "Krura Koshtha (Hard/Constipated bowels)",
       ahara_vihara: "Irregular diet and erratic sleep schedule.",
       urgency_level: "Review Soon",
       is_red_flag: false,
@@ -305,6 +320,7 @@ Extract chief complaint, clinical history, preliminary diagnosis, red-flag statu
     return { ...fallbackData, id: fbData?.[0]?.id };
   }
 }
+
 // ---------------------------------------------------------
 // DYNAMIC CHAT AI ENGINE (MULTILINGUAL SUPPORT)
 // ---------------------------------------------------------
