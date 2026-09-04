@@ -139,7 +139,6 @@ export default function DoctorDashboard() {
 
     const { data, error } = await supabase
       .from("patients")
-      // UPDATED QUERY: Included koshtha_status
       .select(
         "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, urgency_level, primary_complaint, possible_diagnosis, agni_status, koshtha_status, ahara_vihara, dosha_data",
       )
@@ -684,7 +683,7 @@ export default function DoctorDashboard() {
               onClick={() => navigate("/")}
               className="text-xs text-slate-500 hover:text-slate-300 font-bold transition flex items-center justify-center gap-1 mx-auto"
             >
-              ← Back to Patient Kiosk Home
+              ← Back to Home
             </button>
           </div>
         </div>
@@ -693,8 +692,10 @@ export default function DoctorDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-slate-950 p-3 sm:p-4 md:p-8 transition-colors duration-200">
-      <div className="max-w-6xl mx-auto space-y-4">
+    // FIX 1: Replaced min-h-screen with h-screen, w-full, flex, flex-col, and overflow-hidden to lock the outer window
+    <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-slate-950 p-3 sm:p-4 md:p-6 transition-colors duration-200 flex flex-col">
+      {/* By just using w-full, it will stretch, but the outer padding (p-6) keeps the card style! */}
+      <div className="mx-auto w-full flex-1 flex flex-col space-y-4 overflow-hidden">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm gap-3 transition-colors duration-200">
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
@@ -725,7 +726,7 @@ export default function DoctorDashboard() {
               onClick={() => navigate("/")}
               className="text-blue-600 dark:text-blue-400 text-xs hover:underline font-bold bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg"
             >
-              + Kiosk
+              Home
             </button>
 
             <button
@@ -749,8 +750,10 @@ export default function DoctorDashboard() {
         </header>
 
         {activeTab === "queue" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 flex flex-col lg:h-[780px] transition-colors duration-200">
+          // FIX 3: Added flex-1 and overflow-hidden to the main grid to pass height down to columns
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
+            {/* FIX 4: Changed hardcoded lg:h-[780px] to h-full on the sidebar */}
+            <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 flex flex-col h-full overflow-hidden transition-colors duration-200">
               <div className="p-4 border-b border-gray-200 dark:border-slate-800 space-y-3 bg-slate-50 dark:bg-slate-800/50 rounded-t-xl transition-colors duration-200">
                 <button
                   onClick={handleCallNextPatient}
@@ -889,7 +892,8 @@ export default function DoctorDashboard() {
             </div>
 
             {!selectedPatient ? (
-              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 lg:h-[780px] flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 bg-gray-50/50 dark:bg-slate-900/50 transition-colors duration-200">
+              // FIX 5: Changed lg:h-[780px] to h-full for empty state container
+              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 bg-gray-50/50 dark:bg-slate-900/50 transition-colors duration-200">
                 <Stethoscope
                   size={48}
                   className="mb-4 text-gray-300 dark:text-slate-700"
@@ -903,7 +907,8 @@ export default function DoctorDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 lg:h-[780px] lg:overflow-y-auto space-y-6 relative transition-colors duration-200">
+              // FIX 6: Changed lg:h-[780px] to h-full and ensure overflow-y-auto works beautifully here
+              <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 h-full overflow-y-auto space-y-6 relative transition-colors duration-200">
                 {selectedPatient.is_red_flag && (
                   <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
                     <AlertTriangle
@@ -1083,7 +1088,6 @@ export default function DoctorDashboard() {
                   </p>
                 </div>
 
-                {/* UPDATED: 3-Column Layout for Koshtha Pariksha */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="bg-amber-50/60 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-200 dark:border-amber-900/30">
                     <span className="text-[11px] font-bold text-amber-900 dark:text-amber-500 flex items-center gap-1">
@@ -1201,7 +1205,8 @@ export default function DoctorDashboard() {
         )}
 
         {activeTab === "analytics" && (
-          <div className="space-y-6">
+          // FIX 7: Added h-full and overflow-y-auto to allow scrolling within the analytics tab
+          <div className="space-y-6 h-full overflow-y-auto pb-8 pr-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-1 transition-colors duration-200">
                 <div className="flex justify-between items-center text-gray-500 dark:text-slate-400">

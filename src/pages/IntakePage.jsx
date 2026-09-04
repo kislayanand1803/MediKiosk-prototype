@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
   User,
   Activity,
   Calendar,
@@ -43,6 +44,15 @@ export default function IntakePage() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 bg-blue-50 relative">
+      {/* NEW: Back to Home Button */}
+      <button
+        onClick={() => navigate("/")}
+        className="absolute top-4 left-4 flex items-center gap-2 text-gray-500 hover:text-blue-700 font-medium transition-colors bg-white px-3 py-1.5 rounded-xl shadow-sm border border-gray-200 z-10 text-xs sm:text-sm"
+      >
+        <ArrowLeft size={16} />
+        <span className="hidden sm:inline">Back to Home</span>
+      </button>
+
       <div className="absolute top-4 right-4">
         <div className="relative flex items-center bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-blue-50 transition px-3 py-1.5 cursor-pointer">
           <Globe size={16} className="text-blue-700 mr-2" />
