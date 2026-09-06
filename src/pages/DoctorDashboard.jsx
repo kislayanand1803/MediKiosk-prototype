@@ -726,8 +726,8 @@ export default function DoctorDashboard() {
 
             <div className="bg-blue-500/10 p-2 rounded-lg border border-blue-500/20 text-[10px] text-blue-300 text-center font-medium">
               Demo Credentials - ID:{" "}
-              <span className="font-bold text-blue-200">medi-kiosk</span> |
-              Pass: <span className="font-bold text-blue-200">sih2026</span>
+              <span className="font-bold text-blue-200">Hidden</span> | Pass:{" "}
+              <span className="font-bold text-blue-200">Hidden</span>
             </div>
 
             {authError && (

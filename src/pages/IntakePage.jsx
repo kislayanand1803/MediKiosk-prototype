@@ -45,8 +45,8 @@ export default function IntakePage() {
    * Instantly populates the form with dummy data to save time during live pitches.
    */
   const handleQuickFill = () => {
-    setName("Nahar Singh Negi");
-    setAge("21");
+    setName("Prachi");
+    setAge("20");
     setGender("Female");
     setAbhaId("91-4582-1923-8821");
     setHasConsent(true);
