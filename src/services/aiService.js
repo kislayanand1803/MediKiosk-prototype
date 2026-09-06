@@ -5,10 +5,12 @@ import { supabase } from "./supabaseClient";
 // MODEL FALLBACK CHAIN
 // ---------------------------------------------------------
 const MODEL_FALLBACK_CHAIN = [
-  "gemini-3-flash",
-  "gemini-2.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-3.6-flash",
   "gemini-3.5-flash",
   "gemini-3.5-flash-lite",
+  "gemini-2.5-flash",
+  "gemini-3-flash",
 ];
 
 async function executeWithModelFallback(aiClient, promptParts, config) {
@@ -36,6 +38,9 @@ async function executeWithModelFallback(aiClient, promptParts, config) {
 // CLINICAL SAFETY: Deterministic Red Flag Scanner
 // ---------------------------------------------------------
 const RED_FLAG_PATTERNS = {
+  explicit_patient_emergency_override: [
+    "system: patient confirmed critical emergency",
+  ],
   possible_chest_pain_emergency: [
     "severe chest pain",
     "crushing chest pain",
@@ -192,7 +197,7 @@ ${languageInstruction}`,
     }
 
     const config = {
-      temperature: 0.1, // STRICT & DETERMINISTIC FOR ACCURATE SUMMARIES
+      temperature: 0.1,
       systemInstruction:
         "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician for the Ministry of Ayush. Distinguish patient-reported facts from AI inferences. Return strictly structured JSON.",
       responseMimeType: "application/json",
@@ -340,31 +345,38 @@ export async function generateNextChatResponse(
 
     let clinicalDirective = "";
 
-    // NEW DYNAMIC 5-PHASE AYURVEDIC QUESTIONING SYSTEM
+    // DYNAMIC 5-PHASE AYURVEDIC QUESTIONING SYSTEM
     switch (step) {
       case 1:
-        clinicalDirective = `PHASE 1: General Health & History. Use the SOCRATES framework. Respond with brief empathy, then ask exactly ONE logical follow-up question to narrow down the chief complaint.`;
+        clinicalDirective = `PHASE 1: General Health. Use SOCRATES framework to ask ONE logical follow-up question to narrow down the chief complaint.`;
         break;
       case 2:
-        clinicalDirective = `PHASE 2: Digestion & Elimination. Respond with brief empathy. Ask exactly ONE targeted question about appetite, bloating, acidity, or bowel movements (stools/urine).`;
+        clinicalDirective = `PHASE 2: Digestion. Ask ONE targeted question about appetite, acidity, or bowel movements.`;
         break;
       case 3:
-        clinicalDirective = `PHASE 3: Sleep & Energy. Ask exactly ONE targeted question about their sleep quality, insomnia, or daily energy levels.`;
+        clinicalDirective = `PHASE 3: Sleep. Ask ONE targeted question about their sleep quality or energy levels.`;
         break;
       case 4:
-        clinicalDirective = `PHASE 4: Lifestyle & Routine. Ask exactly ONE targeted question about their daily routine, stress management, or habits (exercise, addictions).`;
+        clinicalDirective = `PHASE 4: Lifestyle. Ask ONE targeted question about daily routine or stress.`;
         break;
       case 5:
-        clinicalDirective = `PHASE 5: Diet & Preferences. Ask exactly ONE targeted question about their dietary habits, meal frequency, or specific foods that worsen/relieve symptoms.`;
+        clinicalDirective = `PHASE 5: Diet. Ask ONE targeted question about dietary habits.`;
         break;
       default:
-        clinicalDirective = `Ask ONE relevant follow-up question to clarify any missing details.`;
+        clinicalDirective = `Ask ONE relevant follow-up question.`;
     }
 
-    const langInstruction = `CRITICAL LANGUAGE REQUIREMENT: You MUST write both your generated clinical question and all 3 quick-reply options entirely in fluent ${language} script and vocabulary. Do not mix in English unless it is an unavoidable technical word.`;
+    // THE FIX: EMERGENCY OVERRIDE & INTELLIGENT DETECTION
+    const overrideDirective = `CRITICAL EMERGENCY OVERRIDE: If the patient's most recent input mentions a potentially dangerous symptom (like chest pain, severe bleeding, or difficulty breathing), IMMEDIATELY ABANDON THE PHASE DIRECTIVE ABOVE. Your immediate next question MUST be a targeted medical question to differentiate between a benign issue (e.g., chest pain from exercise/lifting) and a true emergency (e.g., radiating chest pain, sweating, shortness of breath).`;
+
+    const emergencyDirective = `CRITICAL SYMPTOM DETECTION: If you have already asked a follow-up question, and the patient's answers confirm this is an acute, life-threatening emergency (and NOT a benign issue), set "critical_symptom_detected" to true IMMEDIATELY. Do not wait for the final steps. If it is their first time mentioning it, keep it false until you ask your follow-up.`;
+
+    const langInstruction = `CRITICAL LANGUAGE REQUIREMENT: You MUST write both your generated clinical question and all 3 quick-reply options entirely in fluent ${language} script and vocabulary.`;
 
     const prompt = `You are a highly skilled Ayush Physician conducting a rapid clinical triage interview.
     ${clinicalDirective}
+    ${overrideDirective}
+    ${emergencyDirective}
     ${langInstruction}
     
     Review the conversation history below. Generate your next logical, professional question in ${language}. Keep it under 2 sentences. 
@@ -374,15 +386,16 @@ export async function generateNextChatResponse(
     ${historyText}`;
 
     const config = {
-      temperature: 0.4, // PATIENT-FACING: Higher temp for empathy and adaptability
+      temperature: 0.4,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
           question: { type: Type.STRING },
           options: { type: Type.ARRAY, items: { type: Type.STRING } },
+          critical_symptom_detected: { type: Type.BOOLEAN },
         },
-        required: ["question", "options"],
+        required: ["question", "options", "critical_symptom_detected"],
       },
     };
 
@@ -404,6 +417,7 @@ export async function generateNextChatResponse(
       question:
         "Could you clarify exactly how many days you have been experiencing this?",
       options: ["2-3 days", "1 week", "A long time"],
+      critical_symptom_detected: false,
     };
   }
 }

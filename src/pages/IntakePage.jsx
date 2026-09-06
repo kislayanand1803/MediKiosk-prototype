@@ -13,17 +13,37 @@ import {
 } from "lucide-react";
 import { LANGUAGES, getT } from "../utils/translations";
 
+/**
+ * ==========================================
+ * INTAKE PAGE COMPONENT
+ * ==========================================
+ * This page serves as the digital front-desk for the clinic.
+ * It collects essential demographic data and ensures explicit,
+ * DPDP Act 2023 compliant consent before the AI interview begins.
+ */
 export default function IntakePage() {
   const navigate = useNavigate();
+
+  // --- STATE MANAGEMENT ---
+  // Tracks the globally selected language for the session
   const [appLanguage, setAppLanguage] = useState("en");
+
+  // Patient Demographic State
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
   const [abhaId, setAbhaId] = useState("");
+
+  // Legal/Compliance State
   const [hasConsent, setHasConsent] = useState(false);
 
+  // Translation helper function based on selected language
   const t = getT(appLanguage);
 
+  /**
+   * Hackathon/Demo Utility:
+   * Instantly populates the form with dummy data to save time during live pitches.
+   */
   const handleQuickFill = () => {
     setName("Nahar Singh Negi");
     setAge("21");
@@ -32,19 +52,33 @@ export default function IntakePage() {
     setHasConsent(true);
   };
 
+  /**
+   * Form Submission Handler:
+   * Validates consent, packages the patient data, and routes to the AI Chat.
+   */
   const startConsultation = (e) => {
     e.preventDefault();
+
+    // Hard block if data privacy consent is not granted
     if (!hasConsent) {
       alert(t.alert);
       return;
     }
+
+    // Package data to be passed via React Router state
     const patientInfo = { name, age, gender, abhaId };
     navigate("/chat", { state: { patientInfo, appLanguage } });
   };
 
+  /**
+   * ==========================================
+   * RENDER UI
+   * ==========================================
+   */
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-3 sm:p-4 bg-blue-50 relative">
-      {/* NEW: Back to Home Button */}
+      {/* --- FLOATING CONTROLS --- */}
+      {/* Back to Home Button */}
       <button
         onClick={() => navigate("/")}
         className="absolute top-4 left-4 flex items-center gap-2 text-gray-500 hover:text-blue-700 font-medium transition-colors bg-white px-3 py-1.5 rounded-xl shadow-sm border border-gray-200 z-10 text-xs sm:text-sm"
@@ -53,6 +87,7 @@ export default function IntakePage() {
         <span className="hidden sm:inline">Back to Home</span>
       </button>
 
+      {/* Global Language Selector */}
       <div className="absolute top-4 right-4">
         <div className="relative flex items-center bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-blue-50 transition px-3 py-1.5 cursor-pointer">
           <Globe size={16} className="text-blue-700 mr-2" />
@@ -70,7 +105,9 @@ export default function IntakePage() {
         </div>
       </div>
 
+      {/* --- MAIN REGISTRATION CARD --- */}
       <div className="w-full max-w-md p-6 sm:p-8 bg-white shadow-xl rounded-2xl border border-gray-100 mt-10 sm:mt-0">
+        {/* Header & Demo Button */}
         <div className="flex justify-between items-center mb-6 gap-2">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="p-2.5 bg-blue-100 rounded-full text-blue-600 flex-shrink-0">
@@ -87,12 +124,15 @@ export default function IntakePage() {
             type="button"
             onClick={handleQuickFill}
             className="text-[11px] bg-gray-100 hover:bg-gray-200 text-gray-700 px-2.5 py-1 rounded font-semibold transition flex-shrink-0"
+            title="Auto-fill for Hackathon Demo"
           >
             {t.demo}
           </button>
         </div>
 
+        {/* --- INTAKE FORM --- */}
         <form onSubmit={startConsultation} className="space-y-4">
+          {/* Patient Name Field */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
               {t.name}
@@ -113,6 +153,7 @@ export default function IntakePage() {
             </div>
           </div>
 
+          {/* Age & Gender Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
@@ -162,6 +203,7 @@ export default function IntakePage() {
             </div>
           </div>
 
+          {/* ABHA ID (Ayushman Bharat Health Account) Field */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">
               {t.abha}
@@ -181,6 +223,7 @@ export default function IntakePage() {
             </div>
           </div>
 
+          {/* DPDP Act Compliance & Consent Checkbox */}
           <div className="bg-blue-50/70 p-3.5 rounded-xl border border-blue-100 flex items-start gap-3">
             <input
               type="checkbox"
@@ -204,6 +247,7 @@ export default function IntakePage() {
             </label>
           </div>
 
+          {/* Submit Button */}
           <button
             type="submit"
             className="w-full py-3 mt-4 text-white font-bold text-sm bg-blue-600 rounded-lg hover:bg-blue-700 transition shadow-md shadow-blue-600/20"
@@ -212,6 +256,7 @@ export default function IntakePage() {
           </button>
         </form>
 
+        {/* --- DOCTOR PORTAL SHORTCUT --- */}
         <div className="mt-5 pt-4 border-t border-gray-100 text-center">
           <button
             type="button"

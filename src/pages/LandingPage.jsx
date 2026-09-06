@@ -20,16 +20,26 @@ import {
   Building2,
 } from "lucide-react";
 
+/**
+ * ==========================================
+ * LANDING PAGE COMPONENT
+ * ==========================================
+ * This acts as the marketing and pitch page for the hackathon.
+ * It explains the architecture, the 6-step workflow, and provides
+ * direct entry points to both the Patient Kiosk and the Doctor Portal.
+ */
 export default function LandingPage() {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800 selection:bg-green-200">
-      {/* HEADER / NAVIGATION */}
+      {/* ==========================================
+          HEADER / NAVIGATION
+      ========================================== */}
       <nav className="bg-white border-b sticky top-0 z-50 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            {/* LOGO & TAGLINE CONTAINER */}
+            {/* Logo & Tagline */}
             <div className="flex items-center gap-3">
               <div className="bg-green-600 p-2 rounded-lg">
                 <Leaf className="h-6 w-6 text-white" />
@@ -44,6 +54,7 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {/* Navigation Actions */}
             <div className="flex gap-4">
               <button
                 onClick={() => navigate("/doctor")}
@@ -62,12 +73,14 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* HERO SECTION */}
+      {/* ==========================================
+          HERO SECTION
+      ========================================== */}
       <section className="relative bg-white overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-green-50 to-white z-0"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 py-16 sm:py-24">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Hero Copy */}
+            {/* Hero Copy & Call-to-Actions */}
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-xs font-bold uppercase tracking-wider">
                 <span className="relative flex h-2 w-2">
@@ -105,7 +118,8 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Hero Visual (CSS Tablet Mockup) */}
+            {/* Hero Visual: CSS Tablet Mockup 
+                (A visual hook to show judges what the UI feels like) */}
             <div className="relative mx-auto w-full max-w-md perspective-1000">
               <div className="bg-gray-800 rounded-[2.5rem] p-3 shadow-2xl border-4 border-gray-900 transform rotate-y-[-10deg] rotate-x-[5deg] hover:rotate-0 transition-transform duration-700">
                 <div className="bg-gray-50 rounded-[2rem] overflow-hidden border border-gray-700 aspect-[3/4] relative flex flex-col">
@@ -114,7 +128,7 @@ export default function LandingPage() {
                     <Bot size={20} />
                     <span className="font-bold text-sm">MediKiosk Triage</span>
                   </div>
-                  {/* Fake App Body */}
+                  {/* Fake App Chat Body */}
                   <div className="flex-1 p-4 space-y-4 relative overflow-hidden">
                     <div className="bg-green-100/50 p-3 rounded-2xl rounded-bl-none text-sm text-green-900 max-w-[80%]">
                       नमस्ते। मैं आपका आयुष क्लिनिकल एआई सहायक हूँ। आज आपको क्या
@@ -128,7 +142,7 @@ export default function LandingPage() {
                       (Dashavidha Pariksha) क्या आपको खाने के बाद पेट में भारीपन
                       या एसिडिटी महसूस होती है?
                     </div>
-                    {/* Fake voice pulse */}
+                    {/* Fake Voice Pulse Indicator */}
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-600 text-white p-3 rounded-full animate-pulse shadow-lg">
                       <Mic size={24} />
                     </div>
@@ -140,7 +154,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* METRICS BAR */}
+      {/* ==========================================
+          METRICS & HIGHLIGHTS BAR
+      ========================================== */}
       <section className="bg-green-900 text-white py-10 border-y-4 border-orange-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-green-700">
@@ -176,7 +192,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PATIENT JOURNEY / WORKFLOW */}
+      {/* ==========================================
+          WORKFLOW / PATIENT JOURNEY TIMELINE
+      ========================================== */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -193,7 +211,7 @@ export default function LandingPage() {
           </div>
 
           <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-green-200 before:via-orange-200 before:to-green-200">
-            {/* Step 1 */}
+            {/* Timeline Step 1 */}
             <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
               <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-green-600 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                 1
@@ -213,7 +231,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Step 2 */}
+            {/* Timeline Step 2 */}
             <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
               <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-green-600 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                 2
@@ -233,7 +251,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Step 3 */}
+            {/* Timeline Step 3 */}
             <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
               <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-green-600 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                 3
@@ -253,7 +271,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Step 4 */}
+            {/* Timeline Step 4 */}
             <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
               <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-green-600 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                 4
@@ -273,7 +291,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Step 5 */}
+            {/* Timeline Step 5 */}
             <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
               <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-green-600 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                 5
@@ -293,7 +311,7 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Step 6 */}
+            {/* Timeline Step 6 */}
             <div className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
               <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-orange-500 text-white font-bold shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
                 6
@@ -316,7 +334,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* TECH STACK */}
+      {/* ==========================================
+          ARCHITECTURE & TECH STACK
+      ========================================== */}
       <section className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -334,6 +354,7 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Tech Card 1: Gemini */}
             <div className="border border-gray-100 rounded-3xl p-8 bg-gray-50 hover:border-green-300 hover:bg-green-50/30 transition-colors">
               <div className="bg-blue-100 w-12 h-12 rounded-xl flex items-center justify-center mb-6">
                 <BrainCircuit className="text-blue-600" />
@@ -348,6 +369,7 @@ export default function LandingPage() {
               </p>
             </div>
 
+            {/* Tech Card 2: Supabase */}
             <div className="border border-gray-100 rounded-3xl p-8 bg-gray-50 hover:border-orange-300 hover:bg-orange-50/30 transition-colors">
               <div className="bg-orange-100 w-12 h-12 rounded-xl flex items-center justify-center mb-6">
                 <Database className="text-orange-600" />
@@ -362,6 +384,7 @@ export default function LandingPage() {
               </p>
             </div>
 
+            {/* Tech Card 3: React & Vite */}
             <div className="border border-gray-100 rounded-3xl p-8 bg-gray-50 hover:border-green-300 hover:bg-green-50/30 transition-colors">
               <div className="bg-green-100 w-12 h-12 rounded-xl flex items-center justify-center mb-6">
                 <Globe className="text-green-600" />
@@ -379,12 +402,14 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* FOOTER */}
+      {/* ==========================================
+          FOOTER
+      ========================================== */}
       <footer className="bg-gray-900 py-8 text-center border-t-4 border-green-600">
         <div className="flex flex-col items-center space-y-3">
           {/* Project Line */}
           <div className="flex items-center space-x-2">
-            <Leaf className="h-5 w-5 text-green-400" />
+            <Lightbulb className="h-5 w-5 text-green-400" />
             <p className="text-gray-200 font-semibold text-base">
               MediKiosk | Smart India Hackathon 2026
             </p>

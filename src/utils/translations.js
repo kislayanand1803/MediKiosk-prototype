@@ -1,4 +1,15 @@
-// List of all 22 Scheduled Languages of India + English
+/**
+ * ==========================================
+ * MEDIKIOSK MULTILINGUAL DICTIONARY
+ * ==========================================
+ * This file acts as the central translation hub for the kiosk UI.
+ * It ensures the application is highly accessible across India's diverse
+ * linguistic landscape, supporting all 22 Scheduled Languages + English.
+ */
+
+// List of supported languages.
+// The "code" maps directly to BCP-47 locale tags (e.g., 'hi-IN', 'pa-IN')
+// which are required by the Web Speech API to trigger correct Text-to-Speech (TTS).
 export const LANGUAGES = [
   { code: "en", label: "English" },
   { code: "hi", label: "हिन्दी (Hindi)" },
@@ -14,8 +25,8 @@ export const LANGUAGES = [
   { code: "pa", label: "ਪੰਜਾਬੀ (Punjabi)" },
   { code: "as", label: "অসমীয়া (Assamese)" },
   { code: "mai", label: "मैथिली (Maithili)" },
-  { code: "sat", label: "ᱥᱟᱱᱛᱟᱲᱤ (Santali)" },
-  { code: "ks", label: "कॉशुर (Kashmiri)" },
+  { code: "sat", label: "Santali (Roman)" }, // Romanized for better TTS phonetic fallback support
+  { code: "ks", label: "कॉशुर (Kashmiri)" }, // Uses Perso-Arabic script
   { code: "ne", label: "नेपाली (Nepali)" },
   { code: "kok", label: "कोंकणी (Konkani)" },
   { code: "sd", label: "سنڌي (Sindhi)" },
@@ -25,6 +36,12 @@ export const LANGUAGES = [
   { code: "sa", label: "संस्कृतम् (Sanskrit)" },
 ];
 
+/**
+ * ==========================================
+ * UI TRANSLATION OBJECTS
+ * ==========================================
+ * Contains the static text for the Intake Page, Chat Interface, and Success Screens.
+ */
 const dictionary = {
   en: {
     title: "MediKiosk",
@@ -326,7 +343,7 @@ const dictionary = {
       "குறிப்பிடப்பட்டுள்ளது. உங்களிடம் பழைய பரிந்துரை அல்லது ஆய்வறிக்கை இருந்தால் பதிவேற்றவும்.",
     noMicSupport: "உங்கள் உலாவி குரல் உள்ளீட்டை ஆதரிக்கவில்லை.",
     listening: "கேட்கிறது...",
-    phase: "ഘட்டம்",
+    phase: "பகுதி",
     moduleB: "தொகுதி B: மருத்துவ ஆவணம்",
     attached: "இணைக்கப்பட்டுள்ளது:",
     upload: "மருத்துவ அறிக்கையை பதிவேற்றவும்",
@@ -372,7 +389,7 @@ const dictionary = {
     alert: "કૃપા કરીને સંમતિ આપો.",
     greeting: (name) =>
       `નમસ્તે ${name}. હું તમારો આયુષ ક્લિનિકલ AI સહાયક છું. આજે તમને શું તકલીફ છે?`,
-    defaultChips: ["తీవ్ర سرદર્ਦ", "ಎసిడిటి", "સાંધાનો દુખાવો"],
+    defaultChips: ["તીવ્ર માથાનો દુખાવો", "એસિડિટી", "સાંધાનો દુખાવો"],
     finalMsg:
       "નોંધ લેવામાં આવી છે. જો તમારી પાસે પ્રિસ્ક્રિપ્શન હોય તો અપલોડ કરો.",
     noMicSupport: "તમારું બ્રાઉઝર વૉઇસ ઇનપુટને સપોર્ટ કરતું નથી.",
@@ -465,7 +482,7 @@ const dictionary = {
     male: "ಪುರುಷ",
     female: "ಮಹಿಳೆ",
     other: "ಇತರ",
-    abha: "ಆಭಾ ಸಂಖ್ಯೆ (ঐচ্ছಿಕ)",
+    abha: "ಆಭಾ ಸಂಖ್ಯೆ (ಐಚ್ಛಿಕ)",
     abhaP: "ಉದಾ. 91-XXXX-XXXX-XXXX",
     consent: "ನಾನು ಸ್ವಯಂಚಾಲಿತ ಕ್ಲಿನಿಕಲ್ ಇತಿಹಾಸ ಮತ್ತು OCR ಗೆ ಸಮ್ಮತಿಸುತ್ತೇನೆ.",
     btn: "ಆಯುಷ್ ಪ್ರಶ್ನ ಪರೀಕ್ಷೆ ಆರಂಭಿಸಿ ➔",
@@ -622,12 +639,12 @@ const dictionary = {
     abhaP: "ਉਦਾ. 91-XXXX-XXXX-XXXX",
     consent: "ਮੈਂ ਸਵੈਚਾਲਿਤ ਕਲੀਨਿਕਲ ਇਤਿਹਾਸ ਅਤੇ OCR ਲਈ ਸਹਿਮਤੀ ਦਿੰਦਾ ਹਾਂ।",
     btn: "ਆਯੁਸ਼ ਪ੍ਰਸ਼ਨ ਪ੍ਰੀਖਿਆ ਸ਼ੁਰੂ ਕਰੋ ➔",
-    docBtn: "ਡਾਕਟਰ ਪੋਰਟਲ ਲੌਗਇਨ",
+    docBtn: "ਡਾਕਟਰ ਪੋਰਟલ ਲੌਗਇਨ",
     demo: "⚡ ਡੈਮੋ",
     alert: "ਕਿਰਪਾ ਕਰਕੇ ਸਹਿਮਤੀ ਦਿਓ।",
     greeting: (name) =>
       `ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ ${name}। ਮੈਂ ਤੁਹਾਡਾ ਆਯੁਸ਼ ਕਲੀਨਿਕਲ AI ਸਹਾਇਕ ਹਾਂ। ਅੱਜ ਤੁਹਾਨੂੰ ਕੀ ਸਮੱਸਿਆ ਹੈ?`,
-    defaultChips: ["ਤੇਜ਼ سرदर्द", "ਤੇਜ਼ਾਬੀਅਤ", "ਜੋੜਾਂ ਦਾ ਦਰਦ"],
+    defaultChips: ["ਤੇਜ਼ ਸਿਰਦਰਦ", "ਐਸਿਡਿਟੀ", "ਜੋੜਾਂ ਦਾ ਦਰਦ"],
     finalMsg:
       "ਨੋਟ ਕਰ ਲਿਆ ਗਿਆ ਹੈ। ਜੇਕਰ ਤੁਹਾਡੇ ਕੋਲ ਪੁਰਾਣੀ ਪਰਚੀ ਹੈ, ਤਾਂ ਅੱਪਲੋਡ ਕਰੋ।",
     noMicSupport: "ਤੁਹਾਡਾ ਬ੍ਰਾਊਜ਼ਰ ਵੌਇਸ ਇਨਪੁਟ ਦਾ ਸਮਰਥਨ ਨਹੀਂ ਕਰਦਾ।",
@@ -758,41 +775,45 @@ const dictionary = {
     abhaLocker: "आभा आईडी",
   },
 
+  // FIXED: Romanized Santali Translation.
+  // Using English/Latin characters ensures the phonetic fallback TTS engine can read it perfectly.
   sat: {
     title: "MediKiosk",
     subtitle: "Ayush Clinical Intake & Prashna Pariksha",
-    name: "Full Name",
+    name: "Pura Nutum",
     nameP: "e.g. Rahul Sharma",
-    age: "Age",
+    age: "Umer",
     ageP: "e.g. 28",
-    gender: "Gender",
-    select: "Select...",
-    male: "Male",
-    female: "Female",
-    other: "Other",
-    abha: "ABHA Number (Optional)",
+    gender: "Janaang",
+    select: "Bachaw me...",
+    male: "Kora",
+    female: "Kuri",
+    other: "Etagak",
+    abha: "ABHA Number",
     abhaP: "e.g. 91-XXXX-XXXX-XXXX",
-    consent: "I consent to automated clinical history intake.",
-    btn: "Begin Ayush Prashna Pariksha ➔",
-    docBtn: "Physician Portal Login",
+    consent:
+      "Iny do automated clinical history ar OCR lagit he sari iny emeda.",
+    btn: "Ayush Prashna Pariksha Etop Me ➔",
+    docBtn: "Doctor Portal Login",
     demo: "⚡ Demo Fill",
-    alert: "Please grant consent.",
+    alert: "Daya kate consent em me.",
     greeting: (name) =>
-      `Johar ${name}. I am your MediKiosk Ayush AI Clinical Assistant. What symptoms are you experiencing today?`,
-    defaultChips: ["Headache", "Acidity", "Joint Pain"],
-    finalMsg: "Noted. Please upload reports if any.",
-    noMicSupport: "Microphone not supported.",
-    listening: "Listening...",
-    phase: "Phase",
-    moduleB: "Medical Document",
+      `Johar ${name}. Iny do MediKiosk Ayush AI clinical assistant kana. Tehen amag ched ruwa huyug kana?`,
+    defaultChips: ["Bohok Haso", "Acidity", "Ganthi Haso"],
+    finalMsg:
+      "Thik geya. Judi am then purana prescription menak a, tobe nande upload me.",
+    noMicSupport: "Amag browser voice input bae support eda.",
+    listening: "Aanjomed a...",
+    phase: "Dhāp",
+    moduleB: "Medical Kagaj",
     attached: "Attached:",
-    upload: "Upload Image",
+    upload: "Report Upload Me",
     processing: "Processing...",
-    submitDoc: "Submit ➔",
-    dictation: "Voice",
-    chatPlaceholder: "Type here...",
-    succTitle: "Submitted Successfully!",
-    succSub: "Token generated.",
+    submitDoc: "Doctor then bhejaway me ➔",
+    dictation: "Voice Dictation",
+    chatPlaceholder: "Nande type me...",
+    succTitle: "Prashna Pariksha bhalite jama huyena!",
+    succSub: "Amag summary bheja huyena. Token print me.",
     kioskLabel: "MediKiosk Token",
     passTitle: "Pass",
     tokenLabel: "Token",
@@ -801,62 +822,64 @@ const dictionary = {
     waitNote: "Please wait.",
     printBtn: "Print",
     homeBtn: "Home",
-    date: "Date",
-    time: "Time",
+    date: "Mahit",
+    time: "Waqt",
     patientName: "Name",
     ageGender: "Age/Gender",
     abhaLocker: "ABHA ID",
   },
 
+  // FIXED: Proper Kashmiri Translation in Perso-Arabic script.
+  // This matches its fallback TTS engine (Urdu), which only reads Perso-Arabic text.
   ks: {
-    title: "मेडीकियोस्क",
-    subtitle: "आयुष क्लिनिकल इंटेक ते प्रश्न परीक्षा",
-    name: "पूरा नांव",
-    nameP: "उदा. राहुल शर्मा",
-    age: "वय",
-    ageP: "उदा. 28",
-    gender: "लिंग",
-    select: "छानिव...",
-    male: "मर्द",
-    female: "ज़नान",
-    other: "ब्याख",
-    abha: "आभा नंबर (वैकल्पिक)",
-    abhaP: "उदा. 91-XXXX-XXXX-XXXX",
-    consent: "ब छुस क्लिनिकल इतिहास ते OCR खातिर सहमति दिआन।",
-    btn: "आयुष प्रश्न परीक्षा शुरू करिव ➔",
-    docBtn: "डॉक्टर पोर्टल लॉगिन",
-    demo: "⚡ डेमो भरिव",
-    alert: "मेहरबानी करिथ सहमति दियिव।",
+    title: "میڈی کیوسک",
+    subtitle: "آیوش کلینیکل انٹیک تہٕ پرشنا پرکشا",
+    name: "موکمل ناو",
+    nameP: "مثلاً راہول شرما",
+    age: "وٲنٛس",
+    ageP: "مثلاً 28",
+    gender: "جنس",
+    select: "ژٲرِو...",
+    male: "مرد",
+    female: "زنان",
+    other: "بیاکھ",
+    abha: "آبھا نمبر (اختیاری)",
+    abhaP: "مثلاً 91-XXXX-XXXX-XXXX",
+    consent: "بہٕ چھُس کلینیکل تاریخ تہٕ OCR خٲطرٕ رضامندی دِوان۔",
+    btn: "آیوش پرشنا پرکشا شۆروٗع کٔرِو ➔",
+    docBtn: "ڈاکٹر پورٹل لاگ ان",
+    demo: "⚡ ڈیمو",
+    alert: "مہربٲنی کٔرِتھ رضامندی دِیِو۔",
     greeting: (name) =>
-      `नमस्ते ${name} जी। ब छुस च़ोन आयुष क्लिनिकल एआई सहायक। अज़ क्याह तकलीफ छुय?`,
-    defaultChips: ["कलस दर्द", "एसिडिटी", "पच़न मंज़ दर्द"],
+      `آداب ${name}۔ بہٕ چھُس چُون آیوش کلینیکل اے آئی اسسٹنٹ۔ اَز کیاہ تکھلیٖف چھُی؟`,
+    defaultChips: ["شدیٖد کَلہٕ دۄد", "ایسیڈٹی", "جوڑن ہُنٛد دۄد"],
     finalMsg:
-      "नोट करनह आव। अगर तोह्यि निश कांह पर्ची या रिपोर्ट छु, तो मेहरबानी करिथ अपलोड करिव।",
-    noMicSupport: "तुहंद ब्राउज़र वॉइस इनपुट सपोर्ट न छु करान।",
-    listening: "बोझान छु...",
-    phase: "मरहला",
-    moduleB: "मॉड्यूल बी: मेडिकल दस्तावेज़ / लैब ओसीआर",
-    attached: "जोड़ित:",
-    upload: "रिपोर्ट अपलोड करिव",
-    processing: "डेटा प्रोसेस गछ़ान छु...",
-    submitDoc: "डॉक्टरस निशा सोज़िव ➔",
-    dictation: "वॉइस टाइपिंग",
-    chatPlaceholder: "तुहंद जवाब यतिन लिखिव...",
-    succTitle: "प्रश्न परीक्षा कामयाबी सान जमा गय!",
-    succSub: "तुहंद क्लिनिकल सारांश सुरक्षित सोज़नह आव। टोकन प्रिंट करिव।",
-    kioskLabel: "मेडीकियोस्क • आयुष ओपीडी टोकन",
-    passTitle: "कतार पास",
-    tokenLabel: "टोकन नंबर",
-    scanNote: "सत्यापन खातिर QR कोड स्कैन करिव।",
-    systemNote: "आयुष मंत्रालय",
-    waitNote: "मेहरबानी करिथ बिहिव। तुहंद नंबर यियि बानगनह।",
-    printBtn: "टोकन प्रिंट करिव",
-    homeBtn: "कियोस्क होम",
-    date: "तारीख",
-    time: "वक़्त",
-    patientName: "मरीज़ुक नांव",
-    ageGender: "वय / लिंग",
-    abhaLocker: "आभा आईडी",
+      "نوٹ کرنہٕ آو۔ اگر تُہؠ نِش کانٛہہ پُرٲنؠ پرچی چھِ، تیلہِ کٔرِو اَپلوڈ۔",
+    noMicSupport: "تُہُنٛد براؤزر چھُنٕہ وائس ان پٹ سپورٹ کران۔",
+    listening: "بوزان...",
+    phase: "مرحلہٕ",
+    moduleB: "میڈیکل دستاویز",
+    attached: "منسلک:",
+    upload: "رپورٹ اَپلوڈ کٔرِو",
+    processing: "پروسیسنگ...",
+    submitDoc: "ڈاکٹرس نِش سوزِو ➔",
+    dictation: "وائس ٹائپنگ",
+    chatPlaceholder: "یَتین ٹائپ کٔرِو...",
+    succTitle: "پرشنا پرکشا کامیابی سٟتؠ جمع گیؠ!",
+    succSub: "تُہُنٛد خلاصہٕ سوزنہٕ آو۔ ٹوکن پرنٹ کٔرِو۔",
+    kioskLabel: "میڈی کیوسک • آیوش او پی ڈی ٹوکن",
+    passTitle: "قطار پاس",
+    tokenLabel: "ٹوکن نمبر",
+    scanNote: "تصدیٖق خٲطرٕ QR سکین کٔرِو۔",
+    systemNote: "آیوش وزارت",
+    waitNote: "مہربٲنی کٔرِتھ بِہِو۔ تُہُنٛد نمبر یِیہِ بولاونہٕ۔",
+    printBtn: "ٹوکن پرنٹ کٔرِو",
+    homeBtn: "ہوم",
+    date: "تٲریٖخ",
+    time: "وقت",
+    patientName: "مریٖض ناو",
+    ageGender: "وٲنٛس / جنس",
+    abhaLocker: "آبھا آئی ڈی",
   },
 
   ne: {
@@ -981,7 +1004,7 @@ const dictionary = {
     greeting: (name) =>
       `نمسٽي ${name}. آءٌ توهان جو آيوش AI اسسٽنٽ آهيان. اڄ توهان کي ڪهڙي تليف آهي؟`,
     defaultChips: ["سخت سِر جو سور", "تيزابيت", "جوڙن جو سور"],
-    finalMsg: "نوٽ ڪيو ويو آهي. جيڪڏهن توهان وٽ پرچي آهي ته اپلوڊ ڪريو.",
+    finalMsg: "نوٹ ڪيو ويو آهي. جيڪڏهن توهان وٽ پرچي آهي ته اپلوڊ ڪريو.",
     noMicSupport: "توهان جو برائوزر وائس ان پٽ کي سپورٽ نٿو ڪري.",
     listening: "ٻڌي رهيو آهيان...",
     phase: "مرحلو",
@@ -1003,7 +1026,7 @@ const dictionary = {
     printBtn: "پرنٽ ٽوڪن",
     homeBtn: "هوم",
     date: "تاريخ",
-    time: "время",
+    time: "وقت",
     patientName: "مريض جو نالو",
     ageGender: "عمر / جنس",
     abhaLocker: "آڀا آءِ ڊي",
@@ -1118,8 +1141,8 @@ const dictionary = {
     ageP: "उदा. 28",
     gender: "লিংগ",
     select: "বাছাই खालाम...",
-    male: "হিজলা",
-    female: "নিজি",
+    male: "हিজলা",
+    female: "निজি",
     other: "गुन्द्रै",
     abha: "আভা নম্বৰ (অপ्सनेल)",
     abhaP: "उदा. 91-XXXX-XXXX-XXXX",
@@ -1130,16 +1153,16 @@ const dictionary = {
     alert: "मन्थाय होदो।",
     greeting: (name) =>
       `নমস্কার ${name}। आं नोंनि আয়ুশ AI सहायगिरि। दिनै नोंनि मा समस्या जादों?`,
-    defaultChips: ["सान्थि दुखुंनाय", "एচিडिटी", "जोँथाइ दुखुंनाय"],
-    finalMsg: "নোট खालामबाय। जुदि रिपर्ट दंब्ला आपलोड खालामो।",
-    noMicSupport: "ব্রাউজারা ভয়েস ইনপুট সমর্থনয়ালা.",
+    defaultChips: ["सान्थि दुखुंनाय", "एसिडिटी", "जोँथाइ दुखुंनाय"],
+    finalMsg: "नোট खालामबाय। जुदि रिपर्ट दंब्ला आपलोड खालामो।",
+    noMicSupport: "ব্রাউजारा ভয়েस ইনপুট সমর্থনয়ালা.",
     listening: "संनो दं...",
-    phase: "থাপ",
+    phase: "थাপ",
     moduleB: "মেডিকেল দস্তাবেজ",
     attached: "সংযুক্ত:",
     upload: "রিপर्ट आपलोड खालाम",
     processing: "প্রসেসিং...",
-    submitDoc: "ডাক্তারনি सिम थारदो ➔",
+    submitDoc: "ডাক্তারनि सिम थारदो ➔",
     dictation: "ভয়েস টাইপিং",
     chatPlaceholder: "হাফাও টাইপ खालाम...",
     succTitle: "सफलै दाखालायबाय!",
@@ -1210,7 +1233,14 @@ const dictionary = {
   },
 };
 
-// CRASH-PROOF FALLBACK LOGIC
+/**
+ * ==========================================
+ * CRASH-PROOF FALLBACK UTILITY
+ * ==========================================
+ * If a specific text string (like "WaitNote") is missing from a regional
+ * translation object, it safely defaults back to the English string.
+ * This prevents the React app from throwing undefined variable errors.
+ */
 export const getT = (langCode) => {
   const selectedLang = dictionary[langCode] || {};
   return { ...dictionary["en"], ...selectedLang };
