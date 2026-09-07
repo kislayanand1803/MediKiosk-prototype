@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Global browser reset.
+ * Browsers ship with a default 8px margin on <body> and box-sizing
+ * set to content-box — both cause unwanted edge gaps and sizing
+ * surprises once padding/borders are added. Reset them once here
+ * instead of fighting them per-component.
+ */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * #root is the mount point Vite/React renders into (see main.jsx).
+ * It needs an explicit width and a minimum height, or it only takes
+ * up as much space as its content — which is what was leaving the
+ * page looking narrower than the viewport.
+ */
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
 body {
   background-color: #f8fafc;
 }
