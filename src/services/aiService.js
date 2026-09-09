@@ -37,13 +37,15 @@ async function executeWithModelFallback(aiClient, promptParts, config) {
 // ---------------------------------------------------------
 // CLINICAL SAFETY: Deterministic Red Flag Scanner
 // ---------------------------------------------------------
-const RED_FLAG_PATTERNS = {
+export const RED_FLAG_PATTERNS = {
   explicit_patient_emergency_override: [
     "system: patient confirmed critical emergency",
   ],
   possible_chest_pain_emergency: [
     "severe chest pain",
     "crushing chest pain",
+    "radiating chest pain",
+    "chest pain",
     "pressure in chest",
     "chest pain with sweating",
     "chest pain with breathlessness",
@@ -64,6 +66,7 @@ const RED_FLAG_PATTERNS = {
   possible_severe_breathing_emergency: [
     "cannot breathe",
     "can't breathe",
+    "breathlessness",
     "severe breathlessness",
     "severe difficulty breathing",
     "blue lips",
@@ -95,12 +98,16 @@ const RED_FLAG_PATTERNS = {
     "seizure",
     "fit",
     "convulsion",
+    "faint",
+    "might faint",
+    "feeling faint",
+    "losing consciousness",
     "बेहोश",
     "दौरा",
   ],
 };
 
-function deterministicRedFlagCheck(chatHistory) {
+export function deterministicRedFlagCheck(chatHistory) {
   let combinedText = "";
 
   if (Array.isArray(chatHistory)) {
@@ -124,7 +131,7 @@ function deterministicRedFlagCheck(chatHistory) {
 }
 
 // ---------------------------------------------------------
-// CORE AI ENGINE (CLINICAL & AYUSH TRIAGE)
+// CORE AI ENGINE (CLINICAL & AYUSH TRIAGE SUMMARY)
 // ---------------------------------------------------------
 export async function generateMedicalCaseSummary(
   patientInfo,
@@ -327,7 +334,7 @@ ${languageInstruction}`,
 }
 
 // ---------------------------------------------------------
-// DYNAMIC CHAT AI ENGINE (MULTILINGUAL SUPPORT)
+// DYNAMIC CHAT AI ENGINE (OPD KIOSK CONTEXT & EMERGENCY SAFEGUARDS)
 // ---------------------------------------------------------
 export async function generateNextChatResponse(
   chatHistory,
@@ -338,6 +345,11 @@ export async function generateNextChatResponse(
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) throw new Error("API Key missing from .env file");
 
+    // Pre-check deterministic safety scanner on the latest patient utterance
+    const latestPatientMsg =
+      [...chatHistory].reverse().find((m) => m.sender === "user")?.text || "";
+    const deterministicFindings = deterministicRedFlagCheck(latestPatientMsg);
+
     const ai = new GoogleGenAI({ apiKey: apiKey });
     const historyText = chatHistory
       .map((m) => `${m.sender === "ai" ? "Doctor" : "Patient"}: ${m.text}`)
@@ -345,48 +357,55 @@ export async function generateNextChatResponse(
 
     let clinicalDirective = "";
 
-    // DYNAMIC 5-PHASE AYURVEDIC QUESTIONING SYSTEM
+    // 5-PHASE AYURVEDIC QUESTIONING SYSTEM
     switch (step) {
       case 1:
-        clinicalDirective = `PHASE 1: General Health. Use SOCRATES framework to ask ONE logical follow-up question to narrow down the chief complaint.`;
+        clinicalDirective = `PHASE 1: Chief Complaint. Ask ONE focused clinical follow-up question to narrow down the reported symptom location or onset.`;
         break;
       case 2:
-        clinicalDirective = `PHASE 2: Digestion. Ask ONE targeted question about appetite, acidity, or bowel movements.`;
+        clinicalDirective = `PHASE 2: Digestion & Agni. Ask ONE targeted question about appetite, digestion, or bowel regularity.`;
         break;
       case 3:
-        clinicalDirective = `PHASE 3: Sleep. Ask ONE targeted question about their sleep quality or energy levels.`;
+        clinicalDirective = `PHASE 3: Sleep & Energy. Ask ONE targeted question about sleep quality, fatigue, or stress.`;
         break;
       case 4:
-        clinicalDirective = `PHASE 4: Lifestyle. Ask ONE targeted question about daily routine or stress.`;
+        clinicalDirective = `PHASE 4: Lifestyle & Vihara. Ask ONE targeted question about daily routine or physical exertion.`;
         break;
       case 5:
-        clinicalDirective = `PHASE 5: Diet. Ask ONE targeted question about dietary habits.`;
+        clinicalDirective = `PHASE 5: Diet & Ahara. Ask ONE targeted question about regular dietary habits or food triggers.`;
         break;
       default:
-        clinicalDirective = `Ask ONE relevant follow-up question.`;
+        clinicalDirective = `Ask ONE brief summary confirmation question.`;
     }
 
-    // THE FIX: EMERGENCY OVERRIDE & INTELLIGENT DETECTION
-    const overrideDirective = `CRITICAL EMERGENCY OVERRIDE: If the patient's most recent input mentions a potentially dangerous symptom (like chest pain, severe bleeding, or difficulty breathing), IMMEDIATELY ABANDON THE PHASE DIRECTIVE ABOVE. Your immediate next question MUST be a targeted medical question to differentiate between a benign issue (e.g., chest pain from exercise/lifting) and a true emergency (e.g., radiating chest pain, sweating, shortness of breath).`;
+    const kioskContextDirective = `YOU ARE AN AI CLINICAL INTAKE KIOSK LOCATED PHYSICALLY AT A HOSPITAL OPD WAITING COUNTER.
+CRITICAL SAFETY & ROLE RULES:
+1. NEVER act as a remote 911 or 112 ambulance dispatcher.
+2. NEVER tell the patient to "unlock your front door", "wait for responders to arrive at your home", or that you are "dispatching an ambulance to your location".
+3. The patient is standing or seated right in front of this kiosk in the clinic.`;
 
-    const emergencyDirective = `CRITICAL SYMPTOM DETECTION: If you have already asked a follow-up question, and the patient's answers confirm this is an acute, life-threatening emergency (and NOT a benign issue), set "critical_symptom_detected" to true IMMEDIATELY. Do not wait for the final steps. If it is their first time mentioning it, keep it false until you ask your follow-up.`;
+    const emergencyDirective = `CRITICAL RED FLAG & SYNCOPE PROTOCOL:
+If the patient reports symptoms indicating an acute medical emergency (e.g., active radiating chest pain, feeling faint, about to collapse, severe breathing distress, coughing blood):
+- You MUST set "critical_symptom_detected" to true IMMEDIATELY.
+- In "question", output a concise, urgent warning directing the patient to alert the hospital staff immediately (e.g., "CRITICAL: Please alert the nursing desk or hospital staff at this counter immediately for emergency assistance.").
+- DO NOT continue asking conversational routine intake questions.
+- DO NOT ask questions about locking doors or dispatching vehicles.`;
 
-    const langInstruction = `CRITICAL LANGUAGE REQUIREMENT: You MUST write both your generated clinical question and all 3 quick-reply options entirely in fluent ${language} script and vocabulary.`;
+    const langInstruction = `CRITICAL LANGUAGE REQUIREMENT: Output the response JSON entirely in fluent ${language} script and vocabulary.`;
 
-    const prompt = `You are a highly skilled Ayush Physician conducting a rapid clinical triage interview.
-    ${clinicalDirective}
-    ${overrideDirective}
-    ${emergencyDirective}
-    ${langInstruction}
-    
-    Review the conversation history below. Generate your next logical, professional question in ${language}. Keep it under 2 sentences. 
-    Provide 3 short, highly relevant quick-reply option chips in ${language}.
+    const prompt = `${kioskContextDirective}
+${clinicalDirective}
+${emergencyDirective}
+${langInstruction}
 
-    Conversation History:
-    ${historyText}`;
+Conversation History:
+${historyText}
+
+Generate the next response in ${language}. Keep the question under 2 sentences.
+Provide 3 short, clinically relevant quick-reply options in ${language}.`;
 
     const config = {
-      temperature: 0.4,
+      temperature: 0.2,
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -404,19 +423,27 @@ export async function generateNextChatResponse(
       [{ text: prompt }],
       config,
     );
+
     let cleanText = response.text || "{}";
     cleanText = cleanText
       .replace(/```json/gi, "")
       .replace(/```/g, "")
       .trim();
 
-    return JSON.parse(cleanText);
+    const parsed = JSON.parse(cleanText);
+
+    // If deterministic red flags were found in the patient's text, enforce critical detection
+    if (deterministicFindings.length > 0) {
+      parsed.critical_symptom_detected = true;
+    }
+
+    return parsed;
   } catch (error) {
-    console.error("🚨 Live Chat API Error across all fallback models:", error);
+    console.error("🚨 Live Chat API Error across fallback models:", error);
     return {
       question:
-        "Could you clarify exactly how many days you have been experiencing this?",
-      options: ["2-3 days", "1 week", "A long time"],
+        "Could you clarify how long you have been experiencing this discomfort?",
+      options: ["Few hours", "2-3 days", "Over a week"],
       critical_symptom_detected: false,
     };
   }

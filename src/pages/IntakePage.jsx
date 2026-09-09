@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   User,
@@ -15,19 +16,17 @@ import {
   Activity,
   Zap,
 } from "lucide-react";
-import { LANGUAGES, getT } from "../utils/translations";
+import { LANGUAGES } from "../utils/translations";
 
 export default function IntakePage() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
 
-  const [appLanguage, setAppLanguage] = useState("en");
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
   const [abhaId, setAbhaId] = useState("");
   const [hasConsent, setHasConsent] = useState(false);
-
-  const t = getT(appLanguage);
 
   const handleQuickFill = () => {
     setName("Prachi Sharma");
@@ -40,16 +39,14 @@ export default function IntakePage() {
   const startConsultation = (e) => {
     e.preventDefault();
     if (!hasConsent) {
-      alert(t.alert);
+      alert(t("alert"));
       return;
     }
     const patientInfo = { name, age, gender, abhaId };
-    navigate("/chat", { state: { patientInfo, appLanguage } });
+    navigate("/chat", { state: { patientInfo } });
   };
 
   return (
-    // FIX: Using "grid place-items-center" instead of flexbox.
-    // This perfectly centers the form on large screens but prevents clipping on small screens.
     <div className="min-h-screen bg-slate-100 grid place-items-center p-4 sm:p-6 lg:p-8 font-sans">
       <div className="w-full max-w-6xl">
         {/* --- HEADER CONTROLS --- */}
@@ -65,8 +62,8 @@ export default function IntakePage() {
           <div className="flex items-center bg-white border border-slate-200 rounded-full shadow-sm hover:shadow-md transition-all px-3 sm:px-4 py-2 cursor-pointer">
             <Globe size={16} className="text-[#0f3c31] mr-2 shrink-0" />
             <select
-              value={appLanguage}
-              onChange={(e) => setAppLanguage(e.target.value)}
+              value={i18n.language?.slice(0, 2) || "en"}
+              onChange={(e) => i18n.changeLanguage(e.target.value)}
               className="bg-transparent text-[#0f3c31] text-xs sm:text-sm font-bold outline-none cursor-pointer appearance-none pr-4"
             >
               {LANGUAGES.map((lang) => (
@@ -80,7 +77,7 @@ export default function IntakePage() {
 
         {/* --- MAIN SPLIT CARD --- */}
         <div className="bg-white rounded-3xl shadow-2xl flex flex-col md:flex-row overflow-hidden border border-slate-200">
-          {/* --- LEFT PANEL --- */}
+          {/* --- LEFT PANEL: TRUST & STATS --- */}
           <div className="hidden md:flex md:w-5/12 bg-[#0f3c31] p-8 text-white flex-col justify-between relative overflow-hidden shrink-0">
             <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-emerald-700/20 rounded-full blur-3xl"></div>
 
@@ -92,8 +89,7 @@ export default function IntakePage() {
                 MediKiosk
               </h1>
               <p className="text-emerald-100/80 text-sm leading-relaxed mb-8 max-w-sm">
-                Ayush clinical intake and Prashna Pariksha — a guided symptom
-                review before you meet your practitioner.
+                {t("subtitle")}
               </p>
 
               <div className="space-y-5">
@@ -105,10 +101,10 @@ export default function IntakePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-white">
-                      ABDM linked
+                      {t("abdmTitle")}
                     </h3>
                     <p className="text-xs text-emerald-100/60 mt-0.5 leading-relaxed">
-                      Your records sync securely to your ABHA health locker.
+                      {t("abdmDesc")}
                     </p>
                   </div>
                 </div>
@@ -121,10 +117,10 @@ export default function IntakePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-white">
-                      DPDP Act compliant
+                      {t("dpdpTitle")}
                     </h3>
                     <p className="text-xs text-emerald-100/60 mt-0.5 leading-relaxed">
-                      Consent-first data handling, end to end.
+                      {t("dpdpDesc")}
                     </p>
                   </div>
                 </div>
@@ -137,10 +133,10 @@ export default function IntakePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-white">
-                      Ayush aligned
+                      {t("ayushTitle")}
                     </h3>
                     <p className="text-xs text-emerald-100/60 mt-0.5 leading-relaxed">
-                      Questions follow traditional intake practice.
+                      {t("ayushDesc")}
                     </p>
                   </div>
                 </div>
@@ -157,27 +153,26 @@ export default function IntakePage() {
                     </span>
                   </p>
                   <p className="text-[10px] text-emerald-100/60 uppercase tracking-widest mt-0.5">
-                    Avg Intake
+                    {t("avgIntake")}
                   </p>
                 </div>
                 <div>
                   <p className="text-2xl font-black text-white">22</p>
                   <p className="text-[10px] text-emerald-100/60 uppercase tracking-widest mt-0.5">
-                    Languages
+                    {t("languagesStat")}
                   </p>
                 </div>
                 <div>
                   <p className="text-2xl font-black text-white">256</p>
                   <p className="text-[10px] text-emerald-100/60 uppercase tracking-widest mt-0.5">
-                    Encryption
+                    {t("encryption")}
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* --- RIGHT PANEL (FORM AREA) --- */}
-          {/* FIX: Tightened paddings (p-6 lg:p-8) to ensure it fits perfectly on standard laptop screens */}
+          {/* --- RIGHT PANEL: REGISTRATION FORM --- */}
           <div className="w-full md:w-7/12 p-6 lg:p-8 bg-white flex flex-col justify-center">
             <div className="md:hidden flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
               <div className="bg-[#cd6b40] w-10 h-10 rounded-xl flex items-center justify-center shadow-md shrink-0">
@@ -196,10 +191,10 @@ export default function IntakePage() {
             <div className="flex justify-between items-start mb-6 shrink-0">
               <div>
                 <h2 className="text-2xl font-extrabold text-slate-900 mb-1 tracking-tight">
-                  Begin your intake
+                  {t("title")}
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  Fields marked required will be confirmed at the counter.
+                  {t("formSubtitle")}
                 </p>
               </div>
               <button
@@ -207,14 +202,14 @@ export default function IntakePage() {
                 onClick={handleQuickFill}
                 className="text-xs font-bold text-[#cd6b40] bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-orange-100 transition-colors shadow-sm shrink-0"
               >
-                <Zap size={14} className="fill-[#cd6b40]" /> Demo
+                <Zap size={14} className="fill-[#cd6b40]" /> {t("demo")}
               </button>
             </div>
 
             <form onSubmit={startConsultation} className="space-y-4">
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-slate-700 mb-1">
-                  Full name <span className="text-red-500">*</span>
+                  {t("name")} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <User
@@ -225,7 +220,7 @@ export default function IntakePage() {
                     type="text"
                     required
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#0f3c31] focus:border-transparent outline-none transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal"
-                    placeholder="e.g. Prachi Sharma"
+                    placeholder={t("nameP")}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
@@ -235,7 +230,7 @@ export default function IntakePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs sm:text-sm font-bold text-slate-700 mb-1">
-                    Age <span className="text-red-500">*</span>
+                    {t("age")} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Calendar
@@ -248,7 +243,7 @@ export default function IntakePage() {
                       min="1"
                       max="120"
                       className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#0f3c31] focus:border-transparent outline-none transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal"
-                      placeholder="e.g. 28"
+                      placeholder={t("ageP")}
                       value={age}
                       onChange={(e) => setAge(e.target.value)}
                     />
@@ -257,7 +252,7 @@ export default function IntakePage() {
 
                 <div>
                   <label className="block text-xs sm:text-sm font-bold text-slate-700 mb-1">
-                    Gender <span className="text-red-500">*</span>
+                    {t("gender")} <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
                     <Users
@@ -271,11 +266,11 @@ export default function IntakePage() {
                       onChange={(e) => setGender(e.target.value)}
                     >
                       <option value="" disabled className="text-slate-400">
-                        Select...
+                        {t("select")}
                       </option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
+                      <option value="Male">{t("male")}</option>
+                      <option value="Female">{t("female")}</option>
+                      <option value="Other">{t("other")}</option>
                     </select>
                   </div>
                 </div>
@@ -283,7 +278,7 @@ export default function IntakePage() {
 
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-slate-700 mb-1">
-                  ABHA number{" "}
+                  {t("abha")}{" "}
                   <span className="text-slate-400 font-normal text-[10px] sm:text-xs ml-1">
                     (optional)
                   </span>
@@ -296,7 +291,7 @@ export default function IntakePage() {
                   <input
                     type="text"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-[#0f3c31] focus:border-transparent outline-none transition-all text-sm font-medium text-slate-800 placeholder:text-slate-400 placeholder:font-normal font-mono tracking-wide"
-                    placeholder="e.g. 91-XXXX-XXXX-XXXX"
+                    placeholder={t("abhaP")}
                     value={abhaId}
                     onChange={(e) => setAbhaId(e.target.value)}
                   />
@@ -327,10 +322,9 @@ export default function IntakePage() {
                           hasConsent ? "text-[#cd6b40]" : "text-slate-400"
                         }
                       />
-                      DPDP Act, 2023 & ABDM consent
+                      {t("consentTitle")}
                     </span>
-                    I consent to automated clinical history intake, medical
-                    document OCR, and secure PHR transmission.
+                    {t("consent")}
                   </label>
                 </div>
               </div>
@@ -340,7 +334,7 @@ export default function IntakePage() {
                   type="submit"
                   className="w-full py-3.5 text-white font-bold text-sm sm:text-[15px] bg-[#cd6b40] rounded-xl hover:bg-[#b05832] transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 focus:ring-4 focus:ring-[#cd6b40]/30 active:scale-[0.98]"
                 >
-                  Begin Ayush Prashna Pariksha ➔
+                  {t("btn")}
                 </button>
 
                 <div className="relative flex py-4 items-center">
@@ -357,7 +351,7 @@ export default function IntakePage() {
                   className="w-full py-3 px-4 bg-[#0f3c31] hover:bg-[#1a4f43] text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 focus:ring-4 focus:ring-[#0f3c31]/30 active:scale-[0.98]"
                 >
                   <Stethoscope size={16} className="text-emerald-400" />{" "}
-                  Physician portal login
+                  {t("docBtn")}
                 </button>
               </div>
             </form>
