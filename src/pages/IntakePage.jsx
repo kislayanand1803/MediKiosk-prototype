@@ -92,7 +92,7 @@ export default function IntakePage() {
   const initiateAbhaAuth = async () => {
     setIsAuthenticating(true);
     try {
-      const res = await fetch("https://medikiosk-backend-3psl.onrender.com", {
+      const res = await fetch("https://medikiosk-backend-3psl.onrender.com/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ abhaId }),
@@ -119,7 +119,7 @@ export default function IntakePage() {
     e.preventDefault();
     setIsVerifying(true);
     try {
-      const res = await fetch("https://medikiosk-backend-3psl.onrender.com", {
+      const res = await fetch("https://medikiosk-backend-3psl.onrender.com/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ txnId, otp, abhaId }),
