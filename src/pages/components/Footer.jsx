@@ -188,7 +188,7 @@ export default function Footer() {
           {/* Right Side: Social Icons & Back to Top */}
           <div className="flex items-center gap-5 pb-1">
             <a
-              href="#"
+              href="https://github.com/kislayanand1803/MediKiosk-prototype"
               className="text-slate-500 hover:text-white transition"
               title="Repository"
             >
