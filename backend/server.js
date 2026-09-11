@@ -6,10 +6,27 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// Ensures your Vercel frontend is allowed to talk to your Render backend
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST"],
+  }),
+);
 app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
+
+// Health Check Route (Fixes the "Cannot GET /" screen)
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "Online",
+    service: "MediKiosk ABDM Integration API",
+    message: "Backend is active and listening for M1/M3 Handshakes.",
+  });
+});
+
 const ABDM_SANDBOX_URL = "https://abhasbx.abdm.gov.in/abha/api/v3";
 
 /**

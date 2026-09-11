@@ -419,7 +419,7 @@ export default function ChatPage() {
         try {
           console.log("Initiating ABDM Care Context Linking...");
           const linkRes = await fetch(
-            "https://medikiosk-backend-3psl.onrender.com/api/abha/link-care-context",
+            "https://medikiosk-backend-3psl.onrender.com/api/care-context/link",
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
