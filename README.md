@@ -109,4 +109,4 @@ node server.js
 
 This repository contains no sensitive API keys, ABHA details, or personal health information (PHI). All data handled during the demo is mocked sandbox data or explicitly wiped upon session termination in accordance with our data privacy architecture.
 
-Built with ❤️ by \*Team **VaidyaCode\*** for the _Smart India Hackathon 2026_.
+Built with ❤️ by Team **VaidyaCode** for the _Smart India Hackathon 2026_.
