@@ -29,11 +29,14 @@ In India's public and AYUSH hospitals, the doctor-to-patient consultation time i
 ## ✨ Key Features & Modules
 
 - 🗣️ **Multimodal Voice & Touch Intake (Module A & C):** Zero-typing interface. Patients can speak symptoms in 22+ regional languages via native Web Speech API or tap areas of discomfort on an interactive SVG Human Body Map.
+
 - 📄 **AI Document Digitization (Module B):** Integrated with Google Gemini 1.5 Flash. Uploaded PDFs and messy handwritten prescriptions are contextually parsed into strict JSON arrays (Drug Dosages, Lab Values) and checked for abnormal ranges.
+
 - 🔒 **Government Compliant & Interoperable (Module D):**
   - Integrates with the **ABDM / NHA API Gateway** for ABHA ID authentication and Care Context creation.
   - Clinical notes are mapped to international **HL7 FHIR R4** standards.
   - **DPDP Act 2023 Compliant:** Features audio-guided consent and an aggressive stateless volatile memory-wiping protocol to sanitize the kiosk after every patient.
+
 - 👨‍⚕️ **Live Physician Dashboard (Module E):** Real-time queue management powered by Supabase. Doctors view an AI-generated SOAP summary, a chronological medical timeline, AYUSH Dosha/Agni radar charts, and can manually verify AI data against the original physical scans side-by-side.
 
 ---
