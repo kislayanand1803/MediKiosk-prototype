@@ -83,7 +83,7 @@ export default function Footer() {
               </li>
               <li>
                 <a
-                  href="#"
+                  href="https://github.com/kislayanand1803/MediKiosk-prototype/blob/main/ARCHITECTURE.md"
                   className="hover:text-green-400 transition flex items-center gap-2 group"
                 >
                   <FileText
