@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   User,
@@ -15,6 +16,9 @@ import {
   Lock,
   Activity,
   Zap,
+  Volume2,
+  Loader2,
+  Phone,
 } from "lucide-react";
 import { LANGUAGES } from "../utils/translations";
 
@@ -28,6 +32,13 @@ export default function IntakePage() {
   const [abhaId, setAbhaId] = useState("");
   const [hasConsent, setHasConsent] = useState(false);
 
+  // ABDM Milestone 1 Auth States
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [txnId, setTxnId] = useState(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+
   const handleQuickFill = () => {
     setName("Prachi Sharma");
     setAge("20");
@@ -36,18 +47,187 @@ export default function IntakePage() {
     setHasConsent(true);
   };
 
+  const playConsentAudio = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!("speechSynthesis" in window)) {
+      alert("Your browser does not support audio playback.");
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    let consentText = `${t("consentTitle")}. ${t("consent")}`;
+    consentText = consentText.replace(/\b([A-Z]{2,})\b/g, (match) =>
+      match.split("").join(" "),
+    );
+
+    // CRITICAL TTS FIX: Phonetic fallback map for OS engine compatibility
+    const TTS_FALLBACK_MAP = {
+      as: "bn",
+      mni: "bn",
+      mai: "hi",
+      brx: "hi",
+      doi: "hi",
+      kok: "mr",
+      sa: "hi",
+      ks: "ur",
+      sd: "ur",
+      sat: "hi",
+      or: "hi",
+    };
+
+    let baseLangCode = i18n.language?.split("-")[0] || "en";
+    const ttsLangCode = TTS_FALLBACK_MAP[baseLangCode] || baseLangCode;
+
+    const utterance = new SpeechSynthesisUtterance(consentText);
+    utterance.lang = ttsLangCode === "en" ? "en-IN" : `${ttsLangCode}-IN`;
+    utterance.rate = 0.85;
+    utterance.pitch = 1.0;
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // --- ABDM M1 HANDSHAKE FUNCTIONS ---
+  const initiateAbhaAuth = async () => {
+    setIsAuthenticating(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/abha/generate-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ abhaId }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setTxnId(data.txnId);
+        setShowOtpModal(true);
+      } else {
+        alert("NHA Gateway Error: " + data.error);
+      }
+    } catch (err) {
+      console.error(err);
+      alert(
+        "Backend not running. Please start your Node.js server on port 5000.",
+      );
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const verifyOtpAndProceed = async (e) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    try {
+      const res = await fetch("http://localhost:5000/api/abha/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ txnId, otp, abhaId }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        // Demographics successfully fetched from government gateway!
+        setShowOtpModal(false);
+        const patientInfo = {
+          name: data.patientDetails.name || name,
+          age: data.patientDetails.age || age,
+          gender: data.patientDetails.gender || gender,
+          abhaId,
+        };
+        navigate("/chat", { state: { patientInfo } });
+      } else {
+        alert(data.error); // Show "Invalid OTP" error
+      }
+    } catch (err) {
+      alert("Verification failed. Check console for details.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const startConsultation = (e) => {
     e.preventDefault();
     if (!hasConsent) {
       alert(t("alert"));
       return;
     }
-    const patientInfo = { name, age, gender, abhaId };
-    navigate("/chat", { state: { patientInfo } });
+
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+
+    // If patient entered an ABHA ID, route them through the strict ABDM M1 Auth Flow
+    if (abhaId && abhaId.trim() !== "") {
+      initiateAbhaAuth();
+    } else {
+      // Proceed unlinked if they chose not to enter an ABHA ID
+      const patientInfo = { name, age, gender, abhaId: "Not Linked" };
+      navigate("/chat", { state: { patientInfo } });
+    }
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 grid place-items-center p-4 sm:p-6 lg:p-8 font-sans">
+    <div className="min-h-screen bg-slate-100 grid place-items-center p-4 sm:p-6 lg:p-8 font-sans relative">
+      {/* --- NHA M1 OTP MODAL --- */}
+      <AnimatePresence>
+        {showOtpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 text-center border border-slate-200"
+            >
+              <div className="mx-auto bg-blue-50 text-blue-600 w-16 h-16 rounded-full flex items-center justify-center shadow-inner mb-4">
+                <Phone size={28} />
+              </div>
+              <h3 className="text-xl font-black text-gray-900 leading-tight">
+                Verify Identity
+              </h3>
+              <p className="text-xs text-gray-500 mt-2 mb-6 leading-relaxed">
+                Enter the 6-digit OTP sent to your Aadhaar-linked mobile number
+                to sync your ABHA records.
+              </p>
+
+              <form onSubmit={verifyOtpAndProceed} className="space-y-4">
+                <input
+                  type="text"
+                  maxLength="6"
+                  required
+                  className="w-full text-center text-2xl tracking-[0.5em] py-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none font-mono"
+                  placeholder="------"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                />
+
+                <button
+                  type="submit"
+                  disabled={isVerifying || otp.length < 6}
+                  className="w-full py-3.5 text-white font-bold text-sm bg-blue-600 rounded-xl hover:bg-blue-700 transition-all shadow-md disabled:bg-slate-400 flex items-center justify-center gap-2"
+                >
+                  {isVerifying ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : (
+                    <ShieldCheck size={18} />
+                  )}
+                  {isVerifying ? "Verifying..." : "Confirm & Proceed"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOtpModal(false)}
+                  className="text-xs font-bold text-slate-500 hover:text-slate-800 transition"
+                >
+                  Cancel
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="w-full max-w-6xl">
         {/* --- HEADER CONTROLS --- */}
         <div className="flex justify-between items-center mb-4 sm:mb-6">
@@ -62,7 +242,7 @@ export default function IntakePage() {
           <div className="flex items-center bg-white border border-slate-200 rounded-full shadow-sm hover:shadow-md transition-all px-3 sm:px-4 py-2 cursor-pointer">
             <Globe size={16} className="text-[#0f3c31] mr-2 shrink-0" />
             <select
-              value={i18n.language?.slice(0, 2) || "en"}
+              value={i18n.language?.split("-")[0] || "en"}
               onChange={(e) => i18n.changeLanguage(e.target.value)}
               className="bg-transparent text-[#0f3c31] text-xs sm:text-sm font-bold outline-none cursor-pointer appearance-none pr-4"
             >
@@ -298,8 +478,13 @@ export default function IntakePage() {
                 </div>
               </div>
 
+              {/* AUDIO GUIDED CONSENT BOX */}
               <div
-                className={`p-4 rounded-xl border transition-colors mt-4 ${hasConsent ? "bg-orange-50/70 border-orange-200" : "bg-slate-50 border-slate-200"}`}
+                className={`p-4 rounded-xl border transition-colors mt-4 ${
+                  hasConsent
+                    ? "bg-orange-50/70 border-orange-200"
+                    : "bg-slate-50 border-slate-200"
+                }`}
               >
                 <div className="flex items-start gap-3">
                   <div className="flex items-center h-5 mt-0.5 shrink-0">
@@ -311,19 +496,30 @@ export default function IntakePage() {
                       className="w-4 h-4 rounded border-slate-300 text-[#cd6b40] focus:ring-[#cd6b40] cursor-pointer"
                     />
                   </div>
+
                   <label
                     htmlFor="dpdpConsent"
-                    className="text-[11px] sm:text-xs text-slate-600 cursor-pointer leading-relaxed"
+                    className="text-[11px] sm:text-xs text-slate-600 cursor-pointer leading-relaxed flex-1"
                   >
-                    <span className="font-bold text-slate-900 flex items-center gap-1.5 mb-0.5 text-xs sm:text-sm">
-                      <CheckCircle2
-                        size={16}
-                        className={
-                          hasConsent ? "text-[#cd6b40]" : "text-slate-400"
-                        }
-                      />
-                      {t("consentTitle")}
-                    </span>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5 text-xs sm:text-sm">
+                        <CheckCircle2
+                          size={16}
+                          className={
+                            hasConsent ? "text-[#cd6b40]" : "text-slate-400"
+                          }
+                        />
+                        {t("consentTitle")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={playConsentAudio}
+                        title="Read aloud"
+                        className="text-[#1d6b54] bg-emerald-100 hover:bg-emerald-200 p-1.5 rounded-full transition-colors shadow-sm"
+                      >
+                        <Volume2 size={14} />
+                      </button>
+                    </div>
                     {t("consent")}
                   </label>
                 </div>
@@ -332,9 +528,13 @@ export default function IntakePage() {
               <div className="pt-2">
                 <button
                   type="submit"
-                  className="w-full py-3.5 text-white font-bold text-sm sm:text-[15px] bg-[#cd6b40] rounded-xl hover:bg-[#b05832] transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 focus:ring-4 focus:ring-[#cd6b40]/30 active:scale-[0.98]"
+                  disabled={isAuthenticating}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 text-white font-bold text-sm sm:text-[15px] bg-[#cd6b40] rounded-xl hover:bg-[#b05832] transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 focus:ring-4 focus:ring-[#cd6b40]/30 active:scale-[0.98] disabled:bg-slate-400"
                 >
-                  {t("btn")}
+                  {isAuthenticating ? (
+                    <Loader2 size={18} className="animate-spin" />
+                  ) : null}
+                  {isAuthenticating ? "Connecting to NHA Gateway..." : t("btn")}
                 </button>
 
                 <div className="relative flex py-4 items-center">

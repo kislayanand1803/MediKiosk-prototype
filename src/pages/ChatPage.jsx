@@ -18,6 +18,7 @@ import {
   MicOff,
   AlertTriangle,
   ChevronLeft,
+  FileText as FileTextIcon,
 } from "lucide-react";
 import SpeechRecognition, {
   useSpeechRecognition,
@@ -30,7 +31,9 @@ import {
 } from "../services/aiService";
 import { LANGUAGES } from "../utils/translations";
 
-/* Voice & Locale Mapping */
+/* Voice & Locale Mapping
+ * CRITICAL TTS FIX: Ensured all minority languages have phonetic fallbacks so the OS voice engine doesn't go silent
+ */
 const REGIONAL_LANG_MAP = {
   en: { code: "en-IN", keywords: ["english", "en-in"], fallbackLang: null },
   hi: {
@@ -47,7 +50,7 @@ const REGIONAL_LANG_MAP = {
   ml: { code: "ml-IN", keywords: ["malayalam", "ml-in"], fallbackLang: null },
   pa: { code: "pa-IN", keywords: ["punjabi", "pa-in"], fallbackLang: null },
   ur: { code: "ur-IN", keywords: ["urdu", "ur-in"], fallbackLang: null },
-  or: { code: "or-IN", keywords: ["odia", "or-in"], fallbackLang: null },
+  or: { code: "or-IN", keywords: ["odia", "or-in"], fallbackLang: "hi" }, // Added Odia fallback
   ne: { code: "ne-NP", keywords: ["nepali", "ne-in"], fallbackLang: "hi" },
   sa: { code: "sa-IN", keywords: ["sanskrit", "sa-in"], fallbackLang: "hi" },
   mai: { code: "mai-IN", keywords: ["maithili", "mai-in"], fallbackLang: "hi" },
@@ -58,10 +61,9 @@ const REGIONAL_LANG_MAP = {
   mni: { code: "mni-IN", keywords: ["manipuri", "mni-in"], fallbackLang: "bn" },
   sd: { code: "sd-IN", keywords: ["sindhi", "sd-in"], fallbackLang: "ur" },
   ks: { code: "ks-IN", keywords: ["kashmiri", "ks-in"], fallbackLang: "ur" },
-  sat: { code: "sat-IN", keywords: ["santali", "sat-in"], fallbackLang: "en" },
+  sat: { code: "sat-IN", keywords: ["santali", "sat-in"], fallbackLang: "hi" }, // Added Santali fallback
 };
 
-/* Emergency Modal Backup Translations */
 const EMERGENCY_TRANSLATIONS = {
   en: {
     title: "⚠️ Critical Symptom Detected",
@@ -95,7 +97,7 @@ export default function ChatPage() {
   const location = useLocation();
   const { t, i18n } = useTranslation();
 
-  const currentLang = i18n.language?.slice(0, 2) || "en";
+  const currentLang = i18n.language?.split("-")[0] || "en";
   const emText =
     EMERGENCY_TRANSLATIONS[currentLang] || EMERGENCY_TRANSLATIONS.en;
 
@@ -118,14 +120,13 @@ export default function ChatPage() {
   const [isVoiceOn, setIsVoiceOn] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAiThinking, setIsAiThinking] = useState(false);
-  const [uploadedDocBase64, setUploadedDocBase64] = useState(null);
-  const [docFileName, setDocFileName] = useState("");
+
+  // MODULE B: Store an array of uploaded document objects (PDFs/Images)
+  const [uploadedDocs, setUploadedDocs] = useState([]);
 
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [emergencyTimer, setEmergencyTimer] = useState(15);
   const [pendingAiResponse, setPendingAiResponse] = useState(null);
-
-  // NEW: State to trigger the un-dismissible Hard-Lock SOS screen
   const [isEmergencyLocked, setIsEmergencyLocked] = useState(false);
 
   const messagesEndRef = useRef(null);
@@ -134,7 +135,6 @@ export default function ChatPage() {
   const currentAudioRef = useRef(null);
   const TOTAL_STEPS = 7;
 
-  // Emergency Modal Countdown
   useEffect(() => {
     let timer;
     if (showEmergencyModal && emergencyTimer > 0) {
@@ -175,35 +175,48 @@ export default function ChatPage() {
       window.speechSynthesis.cancel();
     }
 
-    const cleanText = text
+    let cleanText = text
       .replace(/[\[\]\(\)\*\_#]/g, "")
       .replace(/^[🗣️📄🤖]\s*/, "")
       .trim();
+    cleanText = cleanText.replace(/\b([A-Z]{2,})\b/g, (match) =>
+      match.split("").join(" "),
+    );
 
     const langConfig = REGIONAL_LANG_MAP[currentLang] || REGIONAL_LANG_MAP.en;
-    const shortCode = langConfig.code.split("-")[0];
+
+    // CRITICAL TTS FIX: Enforce fallback language to prevent OS engine silence
+    const ttsLangCode =
+      langConfig.fallbackLang || langConfig.code.split("-")[0];
 
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
       cleanText,
-    )}&tl=${shortCode}&client=tw-ob`;
+    )}&tl=${ttsLangCode}&client=tw-ob`;
 
     const audio = new Audio(url);
     currentAudioRef.current = audio;
 
-    return audio.play().catch((err) => {
-      console.warn(
-        "Audio autoplay blocked by browser policy until user gesture:",
-        err,
-      );
-      if ("speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.lang = langConfig.code;
-        window.speechSynthesis.speak(utterance);
-      }
-    });
+    const playPromise = audio.play();
+
+    // CRITICAL ABORT FIX: Safely handle the AbortError race condition without crashing React
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        if (err.name === "AbortError") {
+          // This is a harmless error caused by React pausing the audio before it started playing
+          return;
+        }
+
+        console.warn("Audio autoplay blocked by browser policy:", err);
+        // Fallback to Native Speech Synthesis if Google TTS fails
+        if ("speechSynthesis" in window) {
+          const utterance = new SpeechSynthesisUtterance(cleanText);
+          utterance.lang = `${ttsLangCode}-IN`; // Map fallback to local OS voice
+          window.speechSynthesis.speak(utterance);
+        }
+      });
+    }
   };
 
-  // Initial Greeting Mount Effect with Browser Autoplay Policy Unlock
   useEffect(() => {
     if (chatInitialized.current) return;
     chatInitialized.current = true;
@@ -276,11 +289,9 @@ export default function ChatPage() {
     setMessages(updatedHistory);
     setDynamicChips([]);
 
-    // --- HARD-LOCK EMERGENCY DETECTION ---
     const lowerText = userText.toLowerCase();
     const immediateRedFlags = deterministicRedFlagCheck(userText);
 
-    // Explicitly scan for cries for physical help or syncope
     const hasImmediateThreat =
       lowerText.includes("faint") ||
       lowerText.includes("wheelchair") ||
@@ -291,7 +302,6 @@ export default function ChatPage() {
       (immediateRedFlags.length > 0 &&
         (lowerText.includes("help") || lowerText.includes("alone")));
 
-    // If an undeniable physical emergency is detected, trigger the Hard-Lock SOS
     if (hasImmediateThreat) {
       setIsEmergencyLocked(true);
       if (isListening) SpeechRecognition.stopListening();
@@ -301,19 +311,17 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, { text: sosMsg, sender: "ai" }]);
       if (isVoiceOn) speakText(sosMsg);
 
-      // Silently push the emergency case to Supabase in the background to alert the doctor dashboard,
-      // but DO NOT navigate away so the screen remains locked in red.
       generateMedicalCaseSummary(
         patientInfo,
         updatedHistory
           .map((m) => `${m.sender.toUpperCase()}: ${m.text}`)
           .join("\n") +
           "\nSYSTEM: PATIENT CONFIRMED CRITICAL EMERGENCY. SOS TRIGGERED.",
-        uploadedDocBase64,
+        uploadedDocs,
         languageName,
       ).catch((err) => console.error("Background SOS Sync Failed", err));
 
-      return; // Halt all further chat processing
+      return;
     }
 
     if (step < TOTAL_STEPS - 1) {
@@ -325,7 +333,6 @@ export default function ChatPage() {
       );
       setIsAiThinking(false);
 
-      // Normal Soft-Warning Modal Logic
       if (
         aiResponse.critical_symptom_detected &&
         !hasDismissedEmergency.current
@@ -372,13 +379,23 @@ export default function ChatPage() {
     }
   };
 
+  // MODULE B: Multi-document array generation
   const handleDocUpload = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setDocFileName(file.name);
-    const reader = new FileReader();
-    reader.onloadend = () => setUploadedDocBase64(reader.result);
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    const readers = files.map((file) => {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () =>
+          resolve({ name: file.name, type: file.type, base64: reader.result });
+        reader.readAsDataURL(file);
+      });
+    });
+
+    Promise.all(readers).then((results) => {
+      setUploadedDocs((prev) => [...prev, ...results]);
+    });
   };
 
   const handleFinishAndAnalyze = async (isForcedEmergency = false) => {
@@ -387,7 +404,6 @@ export default function ChatPage() {
       let transcriptStr = messages
         .map((m) => `${m.sender.toUpperCase()}: ${m.text}`)
         .join("\n");
-
       if (isForcedEmergency) {
         transcriptStr += "\nSYSTEM: PATIENT CONFIRMED CRITICAL EMERGENCY.";
       }
@@ -395,9 +411,36 @@ export default function ChatPage() {
       const aiResult = await generateMedicalCaseSummary(
         patientInfo,
         transcriptStr,
-        uploadedDocBase64,
+        uploadedDocs,
         languageName,
       );
+
+      if (patientInfo.abhaId && patientInfo.abhaId !== "Not Linked") {
+        try {
+          console.log("Initiating ABDM Care Context Linking...");
+          const linkRes = await fetch(
+            "http://localhost:5000/api/care-context/link",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                abhaId: patientInfo.abhaId,
+                patientName: patientInfo.name,
+                fhirBundleId: aiResult.fhir_bundle.id,
+              }),
+            },
+          );
+          const linkData = await linkRes.json();
+          if (linkData.success) {
+            console.log(
+              `✅ Success! Care Context Ref: ${linkData.careContextReference}`,
+            );
+            aiResult.care_context_ref = linkData.careContextReference;
+          }
+        } catch (err) {
+          console.warn("Care Context Linking Failed (Backend Offline):", err);
+        }
+      }
 
       navigate("/success", {
         state: { currentCase: aiResult, appLanguage: currentLang },
@@ -419,7 +462,6 @@ export default function ChatPage() {
   const handleEmergencyDismiss = () => {
     setShowEmergencyModal(false);
     hasDismissedEmergency.current = true;
-
     if (currentAudioRef.current) currentAudioRef.current.pause();
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     if (pendingAiResponse) {
@@ -430,7 +472,6 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen w-full flex flex-col bg-white overflow-hidden font-sans">
-      {/* Emergency Modal UI (Soft Warning) */}
       <AnimatePresence>
         {showEmergencyModal && !isEmergencyLocked && (
           <motion.div
@@ -455,7 +496,6 @@ export default function ChatPage() {
                   {emText.desc}
                 </p>
               </div>
-
               <div className="space-y-3 pt-2">
                 <button
                   onClick={handleEmergencyConfirm}
@@ -475,7 +515,6 @@ export default function ChatPage() {
         )}
       </AnimatePresence>
 
-      {/* Main Header */}
       <header className="h-16 bg-[#0f3c31] text-white flex items-center justify-between px-4 sm:px-8 shrink-0 z-20 shadow-md border-b border-[#1a4f43]">
         <div className="flex items-center gap-4">
           <button
@@ -512,7 +551,6 @@ export default function ChatPage() {
               ></div>
             </div>
           </div>
-
           <div className="flex items-center bg-[#1a4f43] border border-emerald-700/50 rounded-full px-2.5 py-1 text-xs">
             <Globe size={14} className="text-emerald-200 mr-1.5 shrink-0" />
             <select
@@ -531,7 +569,6 @@ export default function ChatPage() {
               ))}
             </select>
           </div>
-
           <button
             onClick={() => {
               if (currentAudioRef.current) currentAudioRef.current.pause();
@@ -550,9 +587,7 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* Main Grid View */}
       <div className="flex-1 flex overflow-hidden bg-[#f8fafc]">
-        {/* Left Sidebar */}
         <aside className="hidden md:flex w-[260px] bg-[#0f3c31] flex-col shrink-0 z-10 shadow-lg">
           <div className="p-6">
             <div className="bg-[#1a4f43] border border-emerald-700/30 rounded-2xl p-4">
@@ -569,7 +604,6 @@ export default function ChatPage() {
               <p className="text-[11px] text-emerald-100/70 mb-4">
                 {patientInfo.age} years • {patientInfo.gender}
               </p>
-
               <div className="space-y-2 border-t border-emerald-700/50 pt-3">
                 <div className="flex justify-between text-[11px]">
                   <span className="text-emerald-200/70">{t("tokenLabel")}</span>
@@ -588,7 +622,6 @@ export default function ChatPage() {
               </div>
             </div>
           </div>
-
           <div className="px-6 flex-1 overflow-y-auto">
             <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-4">
               {t("intakeStepsTitle")}
@@ -598,31 +631,20 @@ export default function ChatPage() {
                 const stepNum = index + 1;
                 const isCompleted = step > stepNum;
                 const isActive = step === stepNum;
-
                 return (
                   <div
                     key={index}
                     className="relative flex items-center gap-4 z-10 group"
                   >
                     <div
-                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                        isCompleted
-                          ? "bg-emerald-500 border-emerald-500"
-                          : isActive
-                            ? "bg-[#cd6b40] border-[#cd6b40]"
-                            : "bg-[#0f3c31] border-[#1a4f43]"
-                      }`}
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${isCompleted ? "bg-emerald-500 border-emerald-500" : isActive ? "bg-[#cd6b40] border-[#cd6b40]" : "bg-[#0f3c31] border-[#1a4f43]"}`}
                     >
                       {isCompleted && (
                         <div className="w-1.5 h-1.5 bg-[#0f3c31] rounded-full"></div>
                       )}
                     </div>
                     <span
-                      className={`text-xs transition-colors ${
-                        isActive
-                          ? "text-white font-bold"
-                          : "text-emerald-100/50 font-medium"
-                      }`}
+                      className={`text-xs transition-colors ${isActive ? "text-white font-bold" : "text-emerald-100/50 font-medium"}`}
                     >
                       {stepName}
                     </span>
@@ -633,7 +655,6 @@ export default function ChatPage() {
           </div>
         </aside>
 
-        {/* Center Chat Viewport */}
         <main className="flex-1 flex flex-col h-full bg-white relative shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.05)] z-20 rounded-tl-none md:rounded-tl-2xl overflow-hidden">
           <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 scroll-smooth bg-slate-50/30">
             <AnimatePresence initial={false}>
@@ -651,15 +672,8 @@ export default function ChatPage() {
                       AI
                     </div>
                   )}
-
                   <div
-                    className={`max-w-[85%] sm:max-w-[75%] p-4 text-[14px] leading-relaxed shadow-sm ${
-                      msg.sender === "user"
-                        ? "bg-[#1d6b54] text-white rounded-2xl rounded-tr-sm"
-                        : isEmergencyLocked && idx === messages.length - 1
-                          ? "bg-red-50 border border-red-200 text-red-800 rounded-2xl rounded-tl-sm font-bold"
-                          : "bg-slate-100 border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm"
-                    }`}
+                    className={`max-w-[85%] sm:max-w-[75%] p-4 text-[14px] leading-relaxed shadow-sm ${msg.sender === "user" ? "bg-[#1d6b54] text-white rounded-2xl rounded-tr-sm" : isEmergencyLocked && idx === messages.length - 1 ? "bg-red-50 border border-red-200 text-red-800 rounded-2xl rounded-tl-sm font-bold" : "bg-slate-100 border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm"}`}
                   >
                     {msg.text}
                   </div>
@@ -677,10 +691,7 @@ export default function ChatPage() {
                   AI
                 </div>
                 <div className="bg-slate-100 border border-slate-200 p-4 rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-1.5 h-[52px]">
-                  <div
-                    className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  ></div>
+                  <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
                   <div
                     className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"
                     style={{ animationDelay: "150ms" }}
@@ -693,7 +704,6 @@ export default function ChatPage() {
               </motion.div>
             )}
 
-            {/* Mobile Body Selector */}
             {step === 1 && !isAiThinking && !isEmergencyLocked && (
               <div className="block lg:hidden mt-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="text-sm font-bold text-center mb-4 text-slate-700">
@@ -703,7 +713,7 @@ export default function ChatPage() {
               </div>
             )}
 
-            {/* Document Upload Box */}
+            {/* MODULE B: Multiple Document Upload UI */}
             {step >= 5 && !isAiThinking && !isEmergencyLocked && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -715,54 +725,67 @@ export default function ChatPage() {
                     <div className="p-2 bg-slate-100 text-slate-600 rounded-lg">
                       <FileImage size={18} />
                     </div>
-                    {t("moduleB")}
+                    Attach Previous Records (Images/PDFs)
                   </span>
-                  {uploadedDocBase64 && (
-                    <button
-                      onClick={() => {
-                        setUploadedDocBase64(null);
-                        setDocFileName("");
-                      }}
-                      className="p-1 text-red-500 hover:bg-red-50 rounded-md transition"
-                    >
-                      <X size={18} />
-                    </button>
-                  )}
                 </div>
-                {uploadedDocBase64 ? (
-                  <div className="flex items-center gap-3 bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-sm text-emerald-900 truncate">
-                    <CheckCircle
-                      size={16}
-                      className="text-emerald-500 shrink-0"
-                    />
-                    <span className="font-semibold flex-shrink-0">
-                      {t("attached")}
-                    </span>
-                    <span className="truncate font-mono text-xs">
-                      {docFileName}
-                    </span>
+
+                {uploadedDocs.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    {uploadedDocs.map((doc, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between bg-emerald-50 p-2.5 rounded-xl border border-emerald-100 text-sm"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          {doc.type.includes("pdf") ? (
+                            <FileTextIcon
+                              size={16}
+                              className="text-emerald-600 shrink-0"
+                            />
+                          ) : (
+                            <FileImage
+                              size={16}
+                              className="text-emerald-600 shrink-0"
+                            />
+                          )}
+                          <span className="truncate font-medium text-emerald-900">
+                            {doc.name}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() =>
+                            setUploadedDocs(
+                              uploadedDocs.filter((_, i) => i !== idx),
+                            )
+                          }
+                          className="text-red-400 hover:text-red-600 p-1"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-[#1d6b54] hover:bg-emerald-50/30 py-8 rounded-xl cursor-pointer transition-all text-sm text-slate-600 font-semibold text-center group">
-                    <Upload
-                      size={24}
-                      className="text-slate-400 group-hover:text-[#1d6b54] group-hover:-translate-y-1 transition-all"
-                    />
-                    {t("upload")}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleDocUpload}
-                    />
-                  </label>
                 )}
+
+                <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-[#1d6b54] hover:bg-emerald-50/30 py-6 rounded-xl cursor-pointer transition-all text-sm text-slate-600 font-semibold text-center group">
+                  <Upload
+                    size={24}
+                    className="text-slate-400 group-hover:text-[#1d6b54] transition-all"
+                  />
+                  Upload Scans or Lab Reports
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*, application/pdf"
+                    className="hidden"
+                    onChange={handleDocUpload}
+                  />
+                </label>
               </motion.div>
             )}
 
             <div ref={messagesEndRef} className="h-4" />
 
-            {/* Submission Button */}
             {step === TOTAL_STEPS && !isAiThinking && !isEmergencyLocked && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -772,11 +795,7 @@ export default function ChatPage() {
                 <button
                   onClick={() => handleFinishAndAnalyze(false)}
                   disabled={isAnalyzing}
-                  className={`flex items-center gap-2 text-white px-8 py-3.5 rounded-full font-bold text-[15px] transition-all shadow-lg hover:-translate-y-0.5 focus:ring-4 focus:ring-[#cd6b40]/50 ${
-                    isAnalyzing
-                      ? "bg-slate-400 cursor-not-allowed"
-                      : "bg-[#cd6b40] hover:bg-[#b05832]"
-                  }`}
+                  className={`flex items-center gap-2 text-white px-8 py-3.5 rounded-full font-bold text-[15px] transition-all shadow-lg hover:-translate-y-0.5 focus:ring-4 focus:ring-[#cd6b40]/50 ${isAnalyzing ? "bg-slate-400 cursor-not-allowed" : "bg-[#cd6b40] hover:bg-[#b05832]"}`}
                 >
                   {isAnalyzing ? (
                     <Loader2 size={20} className="animate-spin" />
@@ -789,9 +808,7 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* Bottom Chat Input Form Container */}
           <div className="bg-white px-4 sm:px-8 pb-6 pt-2 z-10 flex flex-col items-center border-t border-slate-100">
-            {/* NEW: Hard-Lock SOS Banner replaces the chat input entirely */}
             {isEmergencyLocked ? (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -825,7 +842,7 @@ export default function ChatPage() {
                               setInput("");
                               processMessage(chip);
                             }}
-                            className="whitespace-nowrap px-4 py-2 bg-white border border-slate-200 text-slate-700 text-[13px] rounded-xl hover:border-[#1d6b54] hover:text-[#1d6b54] hover:bg-emerald-50/50 transition-all shadow-sm font-medium shrink-0 focus:ring-2 focus:ring-[#1d6b54]"
+                            className="whitespace-nowrap px-4 py-2 bg-white border border-slate-200 text-slate-700 text-[13px] rounded-xl hover:border-[#1d6b54] hover:text-[#1d6b54] hover:bg-emerald-50/50 transition-all shadow-sm font-medium shrink-0"
                           >
                             {chip}
                           </button>
@@ -836,7 +853,7 @@ export default function ChatPage() {
 
                 <form
                   onSubmit={handleSend}
-                  className="w-full max-w-4xl relative flex items-center bg-slate-100 rounded-full border border-slate-200 p-1.5 focus-within:ring-2 focus-within:ring-[#1d6b54] focus-within:border-transparent transition-all shadow-inner"
+                  className="w-full max-w-4xl relative flex items-center bg-slate-100 rounded-full border border-slate-200 p-1.5 focus-within:ring-2 focus-within:ring-[#1d6b54] transition-all shadow-inner"
                 >
                   <button
                     type="button"
@@ -846,16 +863,11 @@ export default function ChatPage() {
                       showEmergencyModal ||
                       !browserSupportsSpeechRecognition
                     }
-                    className={`p-3 rounded-full transition-all shrink-0 ml-1 ${
-                      isListening
-                        ? "bg-red-500 text-white shadow-md animate-pulse"
-                        : "text-slate-500 hover:bg-slate-200 hover:text-slate-800"
-                    } disabled:opacity-50`}
+                    className={`p-3 rounded-full transition-all shrink-0 ml-1 ${isListening ? "bg-red-500 text-white shadow-md animate-pulse" : "text-slate-500 hover:bg-slate-200 hover:text-slate-800"} disabled:opacity-50`}
                     title={t("dictation")}
                   >
                     {isListening ? <MicOff size={20} /> : <Mic size={20} />}
                   </button>
-
                   <input
                     type="text"
                     disabled={
@@ -869,7 +881,6 @@ export default function ChatPage() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                   />
-
                   <button
                     type="submit"
                     disabled={
@@ -884,17 +895,11 @@ export default function ChatPage() {
                     <Send size={18} className="ml-0.5" />
                   </button>
                 </form>
-
-                <div className="text-center mt-3 text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
-                  <AlertTriangle size={12} className="text-orange-400" />
-                  <span>{t("disclaimer")}</span>
-                </div>
               </>
             )}
           </div>
         </main>
 
-        {/* Persistent Right Panel */}
         <aside className="hidden lg:flex w-[320px] xl:w-[380px] bg-slate-50 border-l border-slate-200 flex-col overflow-y-auto shrink-0 z-10">
           <div className="p-6">
             <div className="mb-4 flex justify-between items-end">
@@ -918,11 +923,7 @@ export default function ChatPage() {
             </div>
 
             <div
-              className={`bg-white p-4 rounded-3xl border shadow-sm flex items-center justify-center min-h-[400px] transition-all duration-500 ${
-                step > 1
-                  ? "border-emerald-200 bg-emerald-50/20 pointer-events-none"
-                  : "border-slate-200"
-              }`}
+              className={`bg-white p-4 rounded-3xl border shadow-sm flex items-center justify-center min-h-[400px] transition-all duration-500 ${step > 1 ? "border-emerald-200 bg-emerald-50/20 pointer-events-none" : "border-slate-200"}`}
             >
               <BodyMapSelector onSelect={processMessage} />
             </div>
@@ -945,9 +946,6 @@ export default function ChatPage() {
                       >
                         <span className="text-sm font-medium text-slate-700 group-hover:text-[#1d6b54]">
                           {symptom}
-                        </span>
-                        <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
-                          Common
                         </span>
                       </button>
                     ),

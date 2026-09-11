@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { supabase } from "./supabaseClient";
+import { generateFHIRBundle } from "../utils/fhirMapper";
 
 // ---------------------------------------------------------
 // MODEL FALLBACK CHAIN
@@ -130,13 +131,38 @@ export function deterministicRedFlagCheck(chatHistory) {
   return findings;
 }
 
+/**
+ * --------------------------------------------------------------------------
+ * SECURE TOKEN GENERATOR
+ * --------------------------------------------------------------------------
+ * Queries Supabase for today's total patient count to securely generate
+ * sequential tokens (e.g., TKN-001) before the record is saved.
+ */
+async function getNextToken() {
+  try {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const { count, error } = await supabase
+      .from("patients")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", startOfToday.toISOString());
+    if (error) throw error;
+    const sequenceNum = (count || 0) + 1;
+    return `TKN-${String(sequenceNum).padStart(3, "0")}`;
+  } catch (err) {
+    console.error("Token generation error:", err);
+    return `TKN-${Math.floor(Math.random() * 900) + 100}`;
+  }
+}
+
 // ---------------------------------------------------------
 // CORE AI ENGINE (CLINICAL & AYUSH TRIAGE SUMMARY)
 // ---------------------------------------------------------
 export async function generateMedicalCaseSummary(
   patientInfo,
   chatHistory,
-  documentImageBase64 = null,
+  // MODULE B: Updated to accept an array of documents (PDFs/Images)
+  uploadedDocs = [],
   language = "English",
 ) {
   try {
@@ -189,24 +215,29 @@ CRITICAL CLINICAL & AYUSH TRIAGING DIRECTIVES:
 3. ACUTE OCR & SURGICAL RED-FLAG OVERRIDE:
    - If the attached document image or OCR shows acute structural/pathological findings (such as hepatic abscess, internal organ inflammation, hemangioma risks, perforation, acute abdomen, or sepsis), you MUST set isRedFlag to true and urgencyLevel to "Urgent".
 
+4. MODULE B DOCUMENT DIGITIZATION (CLINICAL ENTITY PARSING):
+   - You MUST extract medications, lab values, and timeline events from BOTH the patient transcript and any attached OCR images.
+   - Format them into structured JSON arrays as defined by the schema.
+
 ${languageInstruction}`,
       },
     ];
 
-    if (documentImageBase64) {
-      const cleanBase64 = documentImageBase64.replace(
-        /^data:image\/\w+;base64,/,
-        "",
-      );
-      parts.push({
-        inlineData: { mimeType: "image/jpeg", data: cleanBase64 },
+    // MODULE B: Multi-document Gemini Vision Injection
+    if (uploadedDocs && uploadedDocs.length > 0) {
+      uploadedDocs.forEach((doc) => {
+        // Strip the Base64 URI header before sending to Gemini
+        const cleanBase64 = doc.base64.replace(/^data:(.*);base64,/, "");
+        parts.push({
+          inlineData: { mimeType: doc.type || "image/jpeg", data: cleanBase64 },
+        });
       });
     }
 
     const config = {
       temperature: 0.1,
       systemInstruction:
-        "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician for the Ministry of Ayush. Distinguish patient-reported facts from AI inferences. Return strictly structured JSON.",
+        "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician. You must read uploaded medical documents and extract structured entities (meds, labs, timeline) accurately.",
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -215,6 +246,39 @@ ${languageInstruction}`,
           symptomsSummary: { type: Type.STRING },
           possibleDiagnosis: { type: Type.STRING },
           extractedDocNotes: { type: Type.STRING },
+          // MODULE B: Structured JSON Schema for OCR Extraction
+          medications: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                drugName: { type: Type.STRING },
+                dosage: { type: Type.STRING },
+                duration: { type: Type.STRING },
+              },
+            },
+          },
+          labValues: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                testName: { type: Type.STRING },
+                result: { type: Type.STRING },
+                isAbnormal: { type: Type.BOOLEAN },
+              },
+            },
+          },
+          timeline: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                date: { type: Type.STRING },
+                event: { type: Type.STRING },
+              },
+            },
+          },
           agniStatus: { type: Type.STRING },
           koshthaStatus: { type: Type.STRING },
           aharaVihara: { type: Type.STRING },
@@ -232,6 +296,9 @@ ${languageInstruction}`,
           "symptomsSummary",
           "possibleDiagnosis",
           "extractedDocNotes",
+          "medications",
+          "labValues",
+          "timeline",
           "agniStatus",
           "koshthaStatus",
           "aharaVihara",
@@ -259,7 +326,10 @@ ${languageInstruction}`,
       ? "Urgent"
       : parsedData.urgencyLevel;
 
-    const finalCaseData = {
+    const generatedToken = await getNextToken();
+
+    // Construct the primary database object, now including Module B JSON arrays
+    const baseCaseData = {
       name: patientInfo?.name || "Rahul Sharma",
       age: patientInfo?.age || "28",
       gender: patientInfo?.gender || "Male",
@@ -271,6 +341,13 @@ ${languageInstruction}`,
       subjective_history: parsedData.symptomsSummary,
       possible_diagnosis: parsedData.possibleDiagnosis,
       extracted_doc_notes: parsedData.extractedDocNotes,
+
+      // MODULE B: Mapping extracted arrays to Supabase columns
+      medications: parsedData.medications || [],
+      lab_values: parsedData.labValues || [],
+      timeline: parsedData.timeline || [],
+      document_images: uploadedDocs || [], // Store original documents for Doctor verification
+
       agni_status: parsedData.agniStatus,
       koshtha_status: parsedData.koshthaStatus,
       ahara_vihara: parsedData.aharaVihara,
@@ -281,7 +358,15 @@ ${languageInstruction}`,
         { subject: "Pitta", value: parsedData.pittaScore },
         { subject: "Kapha", value: parsedData.kaphaScore },
       ],
+      token_number: generatedToken,
       status: "Pending",
+    };
+
+    const fhirPayload = generateFHIRBundle(baseCaseData);
+
+    const finalCaseData = {
+      ...baseCaseData,
+      fhir_bundle: fhirPayload,
     };
 
     const { data: dbData, error: dbError } = await supabase
@@ -297,6 +382,8 @@ ${languageInstruction}`,
       apiError.message,
     );
 
+    const fallbackToken = await getNextToken();
+
     const fallbackData = {
       name: patientInfo?.name || "Rahul Sharma",
       age: patientInfo?.age || "28",
@@ -310,6 +397,20 @@ ${languageInstruction}`,
         "🗣️ Patient reports intense throbbing headache and sour belching.",
       possible_diagnosis: "🤖 Vata-Pitta Shiroroga / Migraine",
       extracted_doc_notes: "📄 Prior prescription OCR: Paracetamol 650mg SOS.",
+
+      // MODULE B: Fallback arrays for robust demo
+      medications: [
+        { drugName: "Paracetamol", dosage: "650mg", duration: "SOS" },
+      ],
+      lab_values: [
+        { testName: "Hemoglobin", result: "11.2 g/dL", isAbnormal: true },
+      ],
+      timeline: [
+        { date: "2 days ago", event: "Fever and throbbing headache started" },
+        { date: "Yesterday", event: "Took Paracetamol 650mg" },
+      ],
+      document_images: uploadedDocs || [], // Store original documents for Doctor verification
+
       agni_status: "Vishamagni (Irregular digestion)",
       koshtha_status: "Krura Koshtha (Hard/Constipated bowels)",
       ahara_vihara: "Irregular diet and erratic sleep schedule.",
@@ -320,16 +421,23 @@ ${languageInstruction}`,
         { subject: "Pitta", value: 65 },
         { subject: "Kapha", value: 35 },
       ],
+      token_number: fallbackToken,
       status: "Pending",
+    };
+
+    const fallbackFhirPayload = generateFHIRBundle(fallbackData);
+    const finalFallbackData = {
+      ...fallbackData,
+      fhir_bundle: fallbackFhirPayload,
     };
 
     const { data: fbData, error: fbError } = await supabase
       .from("patients")
-      .insert([fallbackData])
+      .insert([finalFallbackData])
       .select();
     if (fbError)
       console.error("Error saving fallback patient to Supabase:", fbError);
-    return { ...fallbackData, id: fbData?.[0]?.id };
+    return { ...finalFallbackData, id: fbData?.[0]?.id };
   }
 }
 
@@ -345,7 +453,6 @@ export async function generateNextChatResponse(
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!apiKey) throw new Error("API Key missing from .env file");
 
-    // Pre-check deterministic safety scanner on the latest patient utterance
     const latestPatientMsg =
       [...chatHistory].reverse().find((m) => m.sender === "user")?.text || "";
     const deterministicFindings = deterministicRedFlagCheck(latestPatientMsg);
@@ -357,7 +464,6 @@ export async function generateNextChatResponse(
 
     let clinicalDirective = "";
 
-    // 5-PHASE AYURVEDIC QUESTIONING SYSTEM
     switch (step) {
       case 1:
         clinicalDirective = `PHASE 1: Chief Complaint. Ask ONE focused clinical follow-up question to narrow down the reported symptom location or onset.`;
@@ -432,7 +538,6 @@ Provide 3 short, clinically relevant quick-reply options in ${language}.`;
 
     const parsed = JSON.parse(cleanText);
 
-    // If deterministic red flags were found in the patient's text, enforce critical detection
     if (deterministicFindings.length > 0) {
       parsed.critical_symptom_detected = true;
     }

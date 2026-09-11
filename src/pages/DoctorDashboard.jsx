@@ -31,6 +31,7 @@ import {
   PieChart as PieIcon,
   Sun,
   Moon,
+  Image as ImageIcon, // MODULE B: Added icon for Document Viewer
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -47,6 +48,9 @@ import {
   Tooltip,
 } from "recharts";
 import { supabase } from "../services/supabaseClient";
+
+// Import the newly built Module B Timeline component
+import ClinicalTimeline from "../components/ClinicalTimeline";
 
 export default function DoctorDashboard() {
   const navigate = useNavigate();
@@ -69,8 +73,8 @@ export default function DoctorDashboard() {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem("medikiosk_theme") === "dark";
   });
-  const [activeTab, setActiveTab] = useState("queue"); // "queue" or "analytics"
-  const [queueFilter, setQueueFilter] = useState("Waiting"); // "Waiting", "In Consultation", "Approved"
+  const [activeTab, setActiveTab] = useState("queue");
+  const [queueFilter, setQueueFilter] = useState("Waiting");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
@@ -86,6 +90,9 @@ export default function DoctorDashboard() {
   const [showFhirModal, setShowFhirModal] = useState(false);
   const [copiedFhir, setCopiedFhir] = useState(false);
 
+  // MODULE B: Document Viewer Modal State
+  const [showDocViewer, setShowDocViewer] = useState(false);
+
   // --- Timers State ---
   const [now, setNow] = useState(new Date());
   const [consultationStartTime, setConsultationStartTime] = useState(null);
@@ -96,7 +103,6 @@ export default function DoctorDashboard() {
    * ==========================================
    */
 
-  // Apply dark mode class to the HTML document body
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add("dark");
@@ -110,15 +116,14 @@ export default function DoctorDashboard() {
   // Security Feature: Auto-logout after 5 minutes of idle time (DPDP Compliance)
   useEffect(() => {
     if (!isAuthenticated) return;
-    const timerInterval = setInterval(() => setNow(new Date()), 1000); // 1-second tick for UI clocks
+    const timerInterval = setInterval(() => setNow(new Date()), 1000);
     let idleTimer;
 
     const resetIdleTimer = () => {
       clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => handleLogout(), 5 * 60 * 1000); // 5 minutes
+      idleTimer = setTimeout(() => handleLogout(), 5 * 60 * 1000);
     };
 
-    // Listen for any user activity to keep the session alive
     const events = ["mousemove", "keydown", "click", "scroll", "touchstart"];
     events.forEach((event) => window.addEventListener(event, resetIdleTimer));
     resetIdleTimer();
@@ -132,12 +137,10 @@ export default function DoctorDashboard() {
     };
   }, [isAuthenticated]);
 
-  // Initial Data Fetch when authentication succeeds or date changes
   useEffect(() => {
     if (isAuthenticated) fetchPatients();
   }, [isAuthenticated, selectedDate]);
 
-  // Supabase Real-Time Listener: Instantly updates the dashboard if a new patient arrives
   useEffect(() => {
     if (!isAuthenticated) return;
     const channel = supabase
@@ -146,7 +149,7 @@ export default function DoctorDashboard() {
         "postgres_changes",
         { event: "*", schema: "public", table: "patients" },
         () => {
-          fetchPatients(); // Re-fetch the list when the database changes
+          fetchPatients();
         },
       )
       .subscribe();
@@ -179,11 +182,10 @@ export default function DoctorDashboard() {
 
   /**
    * ==========================================
-   * 4. DATABASE FETCHING & UPDATING (SUPABASE)
+   * 4. DATABASE FETCHING & UPDATING
    * ==========================================
    */
 
-  // Fetches the queue for the selected date, sorted by Urgency (Red Flags first)
   const fetchPatients = async () => {
     const startDate = new Date(selectedDate);
     startDate.setHours(0, 0, 0, 0);
@@ -198,14 +200,13 @@ export default function DoctorDashboard() {
       )
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString())
-      .order("is_red_flag", { ascending: false }) // Red flags always at the top
-      .order("created_at", { ascending: true }); // Then by arrival time
+      .order("is_red_flag", { ascending: false })
+      .order("created_at", { ascending: true });
 
     if (error) {
       console.error("Supabase fetch error:", error.message);
     } else if (data) {
       setPatients(data);
-      // Auto-select the first patient if none is currently selected
       if (data.length > 0) {
         const isCurrentInNewList =
           selectedPatient && data.find((p) => p.id === selectedPatient.id);
@@ -218,7 +219,7 @@ export default function DoctorDashboard() {
     }
   };
 
-  // Fetches the heavy text fields (history, OCR notes) only when a specific patient is clicked
+  // MODULE B: Fetches the heavy text fields and newly extracted OCR arrays
   const handleSelectPatient = async (pat) => {
     setSelectedPatient(pat);
     setIsEditing(false);
@@ -226,7 +227,10 @@ export default function DoctorDashboard() {
 
     const { data, error } = await supabase
       .from("patients")
-      .select("subjective_history, extracted_doc_notes")
+      // Explicitly fetching the Module B jsonb columns
+      .select(
+        "subjective_history, extracted_doc_notes, medications, lab_values, timeline, document_images",
+      )
       .eq("id", pat.id)
       .single();
 
@@ -239,7 +243,6 @@ export default function DoctorDashboard() {
     }
   };
 
-  // Calls the next un-approved patient in the list
   const handleCallNextPatient = async () => {
     const nextPatient = patients.find(
       (p) => p.status !== "Approved" && p.status !== "In Consultation",
@@ -266,7 +269,6 @@ export default function DoctorDashboard() {
     }
   };
 
-  // Marks the current patient's case as resolved
   const handleApprove = async () => {
     if (!selectedPatient?.id) return;
     const { error } = await supabase
@@ -284,7 +286,6 @@ export default function DoctorDashboard() {
     }
   };
 
-  // Saves edits made by the doctor to the patient's subjective history
   const handleSaveNotes = async () => {
     if (!selectedPatient?.id) return;
     const { error } = await supabase
@@ -304,13 +305,11 @@ export default function DoctorDashboard() {
    * ==========================================
    */
 
-  // Removes AI provenance emojis (🗣️, 📄, 🤖) before printing official documents
   const cleanProvenanceEmoji = (text) => {
     if (!text) return "";
     return text.replace(/^[🗣️📄🤖]\s*/, "");
   };
 
-  // Generates a clean, professional HTML document for physical printing/PDF export
   const handleDownloadReport = () => {
     if (!selectedPatient) return;
 
@@ -412,7 +411,6 @@ export default function DoctorDashboard() {
     }, 250);
   };
 
-  // Generates a compliant ABDM FHIR R4 JSON Bundle for interoperability
   const generateFhirBundle = (patient) => {
     if (!patient) return {};
     const timestamp = new Date().toISOString();
@@ -586,7 +584,6 @@ export default function DoctorDashboard() {
     });
   };
 
-  // Calculates how long a patient has been waiting since triage completion
   const getDynamicWaitTime = (createdAt) => {
     if (!createdAt) return "N/A";
     const diffMs = now - new Date(createdAt);
@@ -597,7 +594,6 @@ export default function DoctorDashboard() {
     return `${hrs}h ${mins}m`;
   };
 
-  // Acts as a live stopwatch while the doctor is consulting a patient
   const getElapsedConsultationTime = () => {
     if (!consultationStartTime) return "00:00";
     const diffSecs = Math.floor((now - consultationStartTime) / 1000);
@@ -606,7 +602,6 @@ export default function DoctorDashboard() {
     return `${mins}:${secs}`;
   };
 
-  // Filters the patient list based on the search bar and the selected tab (Waiting/In Consult/Completed)
   const filteredPatients = patients.filter((p) => {
     const matchesSearch =
       p.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -624,7 +619,6 @@ export default function DoctorDashboard() {
     return matchesSearch;
   });
 
-  // --- Analytics Calculations ---
   const totalFootfall = patients.length;
   const approvedCount = patients.filter((p) => p.status === "Approved").length;
   const redFlagCount = patients.filter((p) => p.is_red_flag).length;
@@ -632,7 +626,6 @@ export default function DoctorDashboard() {
     (p) => p.abha_id && p.abha_id !== "Not Linked",
   ).length;
 
-  // Calculates the average Dosha imbalance across ALL patients for the analytics dashboard
   const avgVata = totalFootfall
     ? Math.round(
         patients.reduce((acc, p) => acc + (p.dosha_data?.[0]?.value || 50), 0) /
@@ -762,7 +755,6 @@ export default function DoctorDashboard() {
    * ==========================================
    */
   return (
-    // Full-screen wrapper preventing outer scrollbars
     <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-slate-950 p-3 sm:p-4 md:p-6 transition-colors duration-200 flex flex-col">
       <div className="mx-auto w-full flex-1 flex flex-col space-y-4 overflow-hidden">
         {/* --- HEADER --- */}
@@ -778,7 +770,6 @@ export default function DoctorDashboard() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            {/* Tab Switcher (Queue vs Analytics) */}
             <div className="bg-gray-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1 transition-colors duration-200">
               <button
                 onClick={() => setActiveTab("queue")}
@@ -800,7 +791,6 @@ export default function DoctorDashboard() {
               Home
             </button>
 
-            {/* Dark Mode & Logout Toggles */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg transition"
@@ -891,7 +881,6 @@ export default function DoctorDashboard() {
                 </div>
               </div>
 
-              {/* Scrollable Patient List */}
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
                 {filteredPatients.length === 0 ? (
                   <p className="text-center text-xs text-gray-500 dark:text-slate-400 mt-10">
@@ -917,7 +906,6 @@ export default function DoctorDashboard() {
                             : "bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700/50"
                         }`}
                       >
-                        {/* Red Flag Warning UI Indicator */}
                         {pat.is_red_flag && (
                           <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
                         )}
@@ -967,7 +955,6 @@ export default function DoctorDashboard() {
 
             {/* MAIN PANEL: Clinical Summary & Insights */}
             {!selectedPatient ? (
-              // Empty State
               <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 bg-gray-50/50 dark:bg-slate-900/50 transition-colors duration-200">
                 <Stethoscope
                   size={48}
@@ -982,9 +969,7 @@ export default function DoctorDashboard() {
                 </p>
               </div>
             ) : (
-              // Selected Patient State
               <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 h-full overflow-y-auto space-y-6 relative transition-colors duration-200">
-                {/* Critical Alert Banner */}
                 {selectedPatient.is_red_flag && (
                   <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
                     <AlertTriangle
@@ -1003,7 +988,6 @@ export default function DoctorDashboard() {
                   </div>
                 )}
 
-                {/* Patient Summary Header & Actions */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 dark:border-slate-800 pb-4 gap-3">
                   <div>
                     <h2 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
@@ -1073,7 +1057,6 @@ export default function DoctorDashboard() {
                   </div>
                 </div>
 
-                {/* Data Provenance Legend */}
                 <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 mt-4 mb-2">
                   <span className="font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                     Data Provenance:
@@ -1089,7 +1072,6 @@ export default function DoctorDashboard() {
                   </span>
                 </div>
 
-                {/* Demographics & AI Diagnosis Core Info */}
                 <div className="bg-gray-50 dark:bg-slate-800/30 p-4 rounded-xl border border-gray-200/60 dark:border-slate-800 space-y-3.5">
                   <div className="border-b border-gray-200 dark:border-slate-800 pb-2.5">
                     <p className="text-[10px] text-gray-500 dark:text-slate-400 uppercase font-bold tracking-wider">
@@ -1135,7 +1117,6 @@ export default function DoctorDashboard() {
                   </div>
                 </div>
 
-                {/* Editable Subjective Notes */}
                 <div>
                   <h4 className="text-xs font-bold uppercase text-gray-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
                     <Activity size={14} /> Subjective Clinical History
@@ -1154,22 +1135,45 @@ export default function DoctorDashboard() {
                   )}
                 </div>
 
-                {/* Extracted Document/Lab Data */}
-                <div className="bg-slate-50 dark:bg-slate-800/30 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-                    <FileSearch
-                      size={14}
-                      className="text-blue-600 dark:text-blue-500 flex-shrink-0"
-                    />{" "}
-                    Digitized Prior Records / Lab OCR
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 break-words">
-                    {selectedPatient.extracted_doc_notes ||
-                      "No prior records attached during this session."}
-                  </p>
+                {/* MODULE B: Extracted Document/Lab Data & Timeline */}
+                <div className="mt-6">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <FileSearch
+                        size={14}
+                        className="text-blue-600 dark:text-blue-500 flex-shrink-0"
+                      />{" "}
+                      Digitized Clinical Timeline & OCR Extracts
+                    </h4>
+                    {/* MODULE B: Original Viewer Trigger */}
+                    {selectedPatient.document_images?.length > 0 && (
+                      <button
+                        onClick={() => setShowDocViewer(true)}
+                        className="flex items-center gap-1.5 text-xs bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-400 px-3 py-1.5 rounded-md font-bold shadow-sm transition"
+                      >
+                        <ImageIcon size={14} /> View Original Scans
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dynamic Timeline Component mapped to the extracted JSON arrays */}
+                  <ClinicalTimeline
+                    timeline={selectedPatient.timeline || []}
+                    medications={selectedPatient.medications || []}
+                    labValues={selectedPatient.lab_values || []}
+                  />
+
+                  <div className="bg-slate-50 dark:bg-slate-800/30 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 mt-3">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 break-words">
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        Raw AI Inference Notes:{" "}
+                      </span>
+                      {selectedPatient.extracted_doc_notes ||
+                        "No prior records attached during this session."}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Ayurvedic Dashavidha Pariksha Metrics */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="bg-amber-50/60 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-200 dark:border-amber-900/30">
                     <span className="text-[11px] font-bold text-amber-900 dark:text-amber-500 flex items-center gap-1">
@@ -1200,7 +1204,6 @@ export default function DoctorDashboard() {
                   </div>
                 </div>
 
-                {/* Dosha Radar Chart */}
                 <div className="bg-blue-50/40 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
                   <h4 className="text-xs font-bold uppercase text-gray-700 dark:text-slate-300 mb-3">
                     Ayurvedic Vikriti Triaging (Dosha Imbalance)
@@ -1290,7 +1293,6 @@ export default function DoctorDashboard() {
         {/* --- ANALYTICS TAB --- */}
         {activeTab === "analytics" && (
           <div className="space-y-6 h-full overflow-y-auto pb-8 pr-2">
-            {/* Top Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-1 transition-colors duration-200">
                 <div className="flex justify-between items-center text-gray-500 dark:text-slate-400">
@@ -1365,7 +1367,6 @@ export default function DoctorDashboard() {
               </div>
             </div>
 
-            {/* Feature Highlights */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-colors duration-200">
                 <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
@@ -1419,7 +1420,6 @@ export default function DoctorDashboard() {
               </div>
             </div>
 
-            {/* Charts & Compliance */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-4 transition-colors duration-200">
                 <div className="flex justify-between items-center">
@@ -1528,7 +1528,6 @@ export default function DoctorDashboard() {
         )}
       </div>
 
-      {/* --- FHIR JSON EXPORT MODAL --- */}
       {showFhirModal && selectedPatient && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
@@ -1567,7 +1566,6 @@ export default function DoctorDashboard() {
               </div>
             </div>
 
-            {/* JSON Output Display */}
             <div className="flex-1 overflow-auto p-4 bg-slate-900 font-mono text-[11px] text-emerald-400">
               <pre>
                 {JSON.stringify(generateFhirBundle(selectedPatient), null, 2)}
@@ -1579,6 +1577,58 @@ export default function DoctorDashboard() {
               <span>
                 Patient Ref: {selectedPatient.token_number || "TKN-PENDING"}
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODULE B: Original Document Viewer Modal */}
+      {showDocViewer && selectedPatient && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col h-[90vh]">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 rounded-t-2xl">
+              <div>
+                <h3 className="text-slate-900 dark:text-white text-base font-black flex items-center gap-2">
+                  <ImageIcon className="text-emerald-500" size={20} /> Original
+                  Patient Uploads
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  Verify AI extractions against the raw scanned documents.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDocViewer(false)}
+                className="bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 p-2 rounded-full transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100 dark:bg-slate-900 space-y-6">
+              {selectedPatient.document_images?.map((doc, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white dark:bg-slate-800 p-2 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700"
+                >
+                  <div className="px-2 py-1 mb-2 text-xs font-bold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-700 flex justify-between">
+                    <span>Document {idx + 1}</span>
+                    <span className="truncate max-w-[200px]">{doc.name}</span>
+                  </div>
+                  {doc.type?.includes("pdf") ? (
+                    <iframe
+                      src={doc.base64}
+                      className="w-full h-[600px] rounded-lg"
+                      title={`PDF Viewer ${idx}`}
+                    />
+                  ) : (
+                    <img
+                      src={doc.base64}
+                      alt={`Upload ${idx}`}
+                      className="w-full object-contain rounded-lg max-h-[800px]"
+                    />
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>
