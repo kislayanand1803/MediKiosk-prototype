@@ -47,7 +47,7 @@ export default function Footer() {
               India.
             </p>
             <div className="inline-block bg-slate-900 border border-slate-800 text-xs font-semibold text-green-400 px-3 py-1 rounded-full">
-              Smart India Hackathon 2026
+              Smart India Hackathon 2026 • SIH26047
             </div>
           </div>
 
@@ -176,8 +176,8 @@ export default function Footer() {
             </div>
             <div className="text-[10px] sm:text-[11px] text-slate-600 font-medium tracking-wide">
               <p>
-                © {new Date().getFullYear()} VaidyaCode. MIT Licensed Open
-                Source.
+                © {new Date().getFullYear()} Team VaidyaCode (IIMT College of
+                Engineering). MIT Licensed Open Source.
               </p>
               <p className="mt-0.5">
                 Not for production medical use without physician oversight.

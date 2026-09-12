@@ -40,13 +40,14 @@ export default function Hero() {
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-green-400">
                 Patient Intake
               </span>{" "}
-              for Ayush Dispensaries
+              for High-Volume Hospitals
             </h1>
 
             <p className="text-lg text-gray-600 leading-relaxed max-w-2xl">
-              Voice-first regional language interviews, automated Dashavidha
-              Pariksha, and ABDM integration—purpose-built for India's
-              high-footfall public healthcare system.
+              Voice-first regional language interviews, zero-typing touch
+              interfaces, automated Dashavidha Pariksha, and ABDM
+              integration—purpose-built for India's high-footfall public
+              healthcare system.
             </p>
 
             {/* Action Buttons */}

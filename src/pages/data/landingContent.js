@@ -9,6 +9,7 @@ import {
   Upload,
   Ticket,
   Stethoscope,
+  Server,
 } from "lucide-react";
 
 /**
@@ -31,7 +32,11 @@ export const NAV_LINKS = [
 export const METRICS = [
   { icon: Languages, value: "22", label: "Scheduled Languages" },
   { icon: Clock, value: "< 90s", label: "Avg. Triage Time" },
-  { icon: ShieldCheck, value: "ABDM", label: "DPDP Compliant" },
+  {
+    icon: ShieldCheck,
+    value: "100%",
+    label: "ABDM & DPDP COMPLIANT",
+  },
   { icon: Cloud, value: "Zero", label: "Local GPUs Needed" },
 ];
 
@@ -48,7 +53,7 @@ export const HERO_CHAT = [
   },
   {
     from: "ai",
-    text: "(Dashavidha Pariksha) क्या आपको खाने के बाद पेट में भारीपन या एसिडिटी महसूस होती है?",
+    text: "क्या आपको खाने के बाद पेट में भारीपन या एसिडिटी महसूस होती है?",
   },
 ];
 
@@ -67,28 +72,28 @@ export const TIMELINE_STEPS = [
     tone: "orange",
     title: "Patient Info & Consent",
     description:
-      "Frictionless capture of essential details (Name, Age, Gender, and ABHA ID) alongside DPDP Act 2023 compliant explicit data consent.",
+      "Frictionless capture of essential details (Name, Age, Gender, and ABHA ID) alongside DPDP Act 2023 compliant explicit data consent, featuring audio-guided readouts for low-literacy users.",
   },
   {
     icon: BrainCircuit,
     tone: "green",
     title: "AI Prashna Pariksha",
     description:
-      "The empathetic AI conducts a dynamic medical interview using the modern SOCRATES framework to narrow down the chief complaint.",
+      "The empathetic AI conducts a dynamic medical interview using both the allopathic SOCRATES framework and the Ayurvedic Dashavidha Pariksha (assessing Prakriti and Vikriti) to narrow down the chief complaint.",
   },
   {
     icon: Upload,
     tone: "orange",
     title: "Document & Report Upload",
     description:
-      "At the end of the AI interview round, patients can upload older physical prescriptions or lab reports for intelligent OCR text extraction.",
+      "At the end of the AI interview round, patients can upload older physical prescriptions or lab reports. The AI goes beyond simple OCR, extracting exact drug dosages and flagging abnormal lab values automatically.",
   },
   {
     icon: Ticket,
     tone: "green",
     title: "Token Generation & Analysis",
     description:
-      "A unique token is generated. The AI compiles the patient info, analyzes the clinical issue, and sends a complete summary directly to the Vaidya Dashboard.",
+      "A unique token is generated. The AI compiles the patient info, analyzes the clinical issue, and securely routes a standardized HL7 FHIR R4 clinical summary directly to the Vaidya Dashboard, registering the visit on the ABDM gateway.",
   },
   {
     icon: Stethoscope,
@@ -122,5 +127,12 @@ export const TECH_STACK = [
     title: "Vite + React",
     description:
       "Lightweight Single Page Application (SPA) architecture utilizing native Web Speech APIs with custom script-family phonetic fallbacks.",
+  },
+  {
+    icon: Server,
+    tone: "purple", 
+    title: "Node.js ABDM Proxy",
+    description:
+      "Standalone Express server bridging the frontend to the National Health Authority (NHA) gateway. Handles secure ABHA OTP handshakes and HL7 FHIR R4 data packaging.",
   },
 ];

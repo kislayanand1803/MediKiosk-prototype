@@ -7,7 +7,7 @@ const TONE_CLASSES = {
   blue: {
     chip: "bg-blue-100",
     icon: "text-blue-600",
-    hover: "hover:border-green-300 hover:bg-green-50/30",
+    hover: "hover:border-blue-300 hover:bg-blue-50/30",
   },
   orange: {
     chip: "bg-orange-100",
@@ -18,6 +18,11 @@ const TONE_CLASSES = {
     chip: "bg-green-100",
     icon: "text-green-600",
     hover: "hover:border-green-300 hover:bg-green-50/30",
+  },
+  purple: {
+    chip: "bg-purple-100",
+    icon: "text-purple-600",
+    hover: "hover:border-purple-300 hover:bg-purple-50/30",
   },
 };
 
@@ -58,11 +63,12 @@ export default function TechStack() {
           <p className="mt-4 text-gray-600 max-w-2xl mx-auto">
             Unlike local LLMs that require expensive GPUs in every clinic,
             MediKiosk uses a modern cloud architecture designed for mass
-            deployment in resource-constrained Ayush dispensaries.
+            deployment in resource-constrained public hospitals and Ayush
+            institutions.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {TECH_STACK.map((card) => (
             <TechCard key={card.title} {...card} />
           ))}
