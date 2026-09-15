@@ -39,11 +39,19 @@ MediKiosk is an AI-powered, self-service clinical intake platform designed to so
 - **NHA Proxy Bridge:** A standalone Node.js server securely proxies M1 (OTP Handshake) and M3 (Care Context Registration) requests to the National Health Authority gateway.
 - **FHIR R4 Mapping:** Internal JSON clinical notes are transformed into HL7 FHIR R4 standard Bundles (`Patient`, `Encounter`, `Condition`, `ClinicalImpression` resources).
 
-### Module E: Live-Syncing Physician Dashboard
+### Module E: Live-Syncing Physician Dashboard & eRx
 
 - **Real-Time Queue Management:** Database real-time subscriptions push new patient tokens instantly to the doctor's screen.
 - **Clinical Data Visualization:** Generates chronological clinical timelines and AYUSH Dosha/Agni radar charts.
 - **Source-Truth Verification:** Allows physicians to view AI-generated JSON dosages side-by-side with the original uploaded physical scans for manual verification before HIS approval.
+- **Digital E-Prescription (eRx) Generator:** Dynamically constructs and prints Ministry-branded Ayush prescriptions natively via browser print spoolers, combining AI triage data with physician notes.
+
+### Module F: Ayush Ministry Command Center (Analytics)
+
+- **Global Historical Telemetry:** Aggregates database-wide patient metrics independent of the daily queue to provide long-term facility insights.
+- **Syndromic Surveillance:** Utilizes an NLP keyword parser to categorize and track the top 5 chief complaints (e.g., Fever, Respiratory, Digestive) across the population.
+- **Operational Heatmap:** Maps facility congestion across a 24-hour cycle to identify severe counter bottlenecks and optimize triage staffing.
+- **Data Export Pipeline:** Compiles global patient records into structured CSV reports for Ministry-level disease tracking and compliance auditing.
 
 ## 4. Security & Data Protection Protocols
 
