@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../services/supabaseClient";
+
 import { useDoctorSession } from "./dashboard-hooks/useDoctorSession";
 import { useDarkMode } from "./dashboard-hooks/useDarkMode";
 import { useLiveClock } from "./dashboard-hooks/useLiveClock";
@@ -7,7 +9,12 @@ import { useIdleLogout } from "./dashboard-hooks/useIdleLogout";
 import { usePatientQueue } from "./dashboard-hooks/usePatientQueue";
 import { PATIENT_STATUS } from "./dashboard-data/patientStatus";
 import { downloadClinicalReport } from "./dashboard-utils/clinicalReport";
-import { copyFhirBundle, downloadFhirBundle } from "./dashboard-utils/fhirBundle";
+import {
+  copyFhirBundle,
+  downloadFhirBundle,
+} from "./dashboard-utils/fhirBundle";
+import { generateEPrescription } from "./dashboard-utils/ePrescription";
+
 import LoginScreen from "./dashboard-components/LoginScreen";
 import DashboardHeader from "./dashboard-components/DashboardHeader";
 import QueueTab from "./dashboard-components/QueueTab";
@@ -16,30 +23,9 @@ import FhirExportModal from "./dashboard-components/FhirExportModal";
 import DocumentViewerModal from "./dashboard-components/DocumentViewerModal";
 
 /**
- * ==========================================
+ * ============================================================================
  * DOCTOR DASHBOARD (PHYSICIAN PORTAL)
- * ==========================================
- * Top-level page for the Vaidya/physician portal. This component
- * owns only the state that's genuinely shared across the whole page
- * (auth session, active tab, dark mode, date/filters, which modal is
- * open) and delegates everything else to focused hooks and
- * dashboard-components:
- *
- *   - useDoctorSession → Supabase Auth session (replaces the old
- *                        client-side credential check — see
- *                        SUPABASE_AUTH_SETUP.md for the one-time
- *                        dashboard configuration this depends on)
- *   - useDarkMode      → theme persistence
- *   - useLiveClock     → the ticking "now" used for wait/consult timers
- *   - useIdleLogout    → DPDP-driven auto-lock after inactivity
- *   - usePatientQueue  → fetching, real-time sync, and actions on the
- *                        day's patient queue (including Module B's
- *                        OCR/timeline/document fields)
- *
- * The `dashboard-` prefix on these folders (rather than plain
- * "components"/"hooks") keeps this page's building blocks visually
- * distinct from LandingPage's components/data folders and from the
- * app-wide src/components folder (e.g. ClinicalTimeline).
+ * ============================================================================
  */
 export default function DoctorDashboard() {
   const navigate = useNavigate();
@@ -51,24 +37,276 @@ export default function DoctorDashboard() {
   const [activeTab, setActiveTab] = useState("queue");
   const [queueFilter, setQueueFilter] = useState(PATIENT_STATUS.WAITING);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [showFhirModal, setShowFhirModal] = useState(false);
   const [showDocViewer, setShowDocViewer] = useState(false);
   const [copiedFhir, setCopiedFhir] = useState(false);
 
+  // Daily Queue Fetch
   const queue = usePatientQueue(selectedDate, isAuthenticated);
 
-  // Selecting a patient who's already "In Consultation" (e.g. reopened
-  // from another device) restarts the local stopwatch if none is running.
+  // ========================================================================
+  // GLOBAL HISTORICAL FETCH FOR ANALYTICS (FIXED RACE CONDITION)
+  // ========================================================================
+  const [allPatients, setAllPatients] = useState([]);
+
+  useEffect(() => {
+    if (!isAuthenticated || activeTab !== "analytics") return;
+
+    let isMounted = true;
+
+    async function loadAnalytics() {
+      try {
+        const { data, error } = await supabase
+          .from("patients")
+          .select(
+            "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, primary_complaint, dosha_data",
+          );
+
+        if (error) {
+          console.error("Supabase Analytics Fetch Error:", error);
+          return;
+        }
+
+        if (data && isMounted) {
+          setAllPatients(data);
+        }
+      } catch (err) {
+        console.error("Analytics network error:", err);
+      }
+    }
+
+    loadAnalytics();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, activeTab, queue.patients.length]);
+
+  // If allPatients hasn't finished loading yet, fallback to queue.patients so the UI never displays 0
+  const activeDataset = allPatients.length > 0 ? allPatients : queue.patients;
+
+  const analyticsFootfall = activeDataset.length;
+  const analyticsApproved = activeDataset.filter(
+    (p) => p.status === PATIENT_STATUS.APPROVED,
+  ).length;
+  const analyticsRedFlag = activeDataset.filter((p) => p.is_red_flag).length;
+  const analyticsAbha = activeDataset.filter(
+    (p) => p.abha_id && p.abha_id !== "Not Linked",
+  ).length;
+
+  // 1. National Dosha Trends
+  const averageDosha = (index, fallback) =>
+    analyticsFootfall
+      ? Math.round(
+          activeDataset.reduce(
+            (sum, p) => sum + (p.dosha_data?.[index]?.value ?? 50),
+            0,
+          ) / analyticsFootfall,
+        )
+      : fallback;
+
+  const doshaBarData = [
+    { name: "Vata (Air)", value: averageDosha(0, 65) },
+    { name: "Pitta (Fire)", value: averageDosha(1, 55) },
+    { name: "Kapha (Earth)", value: averageDosha(2, 40) },
+  ];
+
+  // 2. Syndromic Surveillance NLP Parser
+  const getTopComplaints = () => {
+    const cats = {
+      Fever: 0,
+      Pain: 0,
+      Respiratory: 0,
+      Digestive: 0,
+      Skin: 0,
+      Other: 0,
+    };
+    activeDataset.forEach((p) => {
+      const text = (p.primary_complaint || "").toLowerCase();
+      if (
+        text.includes("fever") ||
+        text.includes("बुखार") ||
+        text.includes("hot") ||
+        text.includes("chills")
+      )
+        cats.Fever++;
+      else if (
+        text.includes("pain") ||
+        text.includes("ache") ||
+        text.includes("दर्द") ||
+        text.includes("सिरदर्द") ||
+        text.includes("headache")
+      )
+        cats.Pain++;
+      else if (
+        text.includes("cough") ||
+        text.includes("breath") ||
+        text.includes("खांसी") ||
+        text.includes("सांस") ||
+        text.includes("cold")
+      )
+        cats.Respiratory++;
+      else if (
+        text.includes("stomach") ||
+        text.includes("digestion") ||
+        text.includes("vomit") ||
+        text.includes("पेट") ||
+        text.includes("उल्टी") ||
+        text.includes("nausea")
+      )
+        cats.Digestive++;
+      else if (
+        text.includes("skin") ||
+        text.includes("rash") ||
+        text.includes("itch") ||
+        text.includes("खुजली")
+      )
+        cats.Skin++;
+      else cats.Other++;
+    });
+
+    return Object.entries(cats)
+      .map(([name, count]) => ({ name, count }))
+      .filter((c) => c.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  };
+
+  // 3. Patient Demographics Split
+  const getDemographics = () => {
+    const ages = { "0-18": 0, "19-35": 0, "36-50": 0, "51+": 0 };
+    const genders = { Male: 0, Female: 0, Other: 0 };
+
+    activeDataset.forEach((p) => {
+      const age = parseInt(p.age, 10);
+      if (!isNaN(age)) {
+        if (age <= 18) ages["0-18"]++;
+        else if (age <= 35) ages["19-35"]++;
+        else if (age <= 50) ages["36-50"]++;
+        else ages["51+"]++;
+      } else {
+        ages["19-35"]++;
+      }
+
+      if (p.gender === "Male") genders.Male++;
+      else if (p.gender === "Female") genders.Female++;
+      else genders.Other++;
+    });
+
+    return {
+      ageData: Object.entries(ages).map(([name, count]) => ({ name, count })),
+      genderData: Object.entries(genders).map(([name, count]) => ({
+        name,
+        count,
+      })),
+    };
+  };
+
+  // 4. 24-Hour Peak OPD Heatmap
+  const getPeakHours = () => {
+    const hours = Array(24).fill(0);
+    activeDataset.forEach((p) => {
+      if (p.created_at) {
+        try {
+          const hour = new Date(p.created_at).getHours();
+          if (!isNaN(hour)) {
+            hours[hour]++;
+          }
+        } catch (e) {
+          // Ignore invalid timestamp
+        }
+      }
+    });
+    return hours.map((count, hour) => ({
+      time: `${String(hour).padStart(2, "0")}:00`,
+      count,
+    }));
+  };
+
+  // ========================================================================
+  // CSV EXPORT UTILITY
+  // ========================================================================
+  const exportMinistryReport = () => {
+    if (!activeDataset || activeDataset.length === 0) {
+      alert("No patient data available to export.");
+      return;
+    }
+
+    const headers = [
+      "Date",
+      "Token Number",
+      "Patient Name",
+      "Age",
+      "Gender",
+      "ABHA ID",
+      "Chief Complaint",
+      "Status",
+      "Priority",
+    ];
+    const csvRows = [headers.join(",")];
+
+    activeDataset.forEach((p) => {
+      const date = p.created_at
+        ? new Date(p.created_at).toLocaleDateString()
+        : "N/A";
+      const complaint = p.primary_complaint
+        ? `"${p.primary_complaint.replace(/"/g, '""').replace(/\n/g, " ")}"`
+        : '"N/A"';
+      const name = p.name ? `"${p.name}"` : '"N/A"';
+
+      const row = [
+        date,
+        p.token_number || "N/A",
+        name,
+        p.age || "N/A",
+        p.gender || "N/A",
+        p.abha_id || "Unlinked",
+        complaint,
+        p.status || "Pending",
+        p.is_red_flag ? "CRITICAL" : "Routine",
+      ];
+      csvRows.push(row.join(","));
+    });
+
+    const csvString = csvRows.join("\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `Ayush_Ministry_Report_${new Date().toISOString().split("T")[0]}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // ========================================================================
+  // APPROVE + E-PRESCRIPTION TRIGGER
+  // ========================================================================
+  const handleApproveAndGenerateRx = async () => {
+    const success = await queue.handleApprove();
+    if (success) {
+      generateEPrescription(queue.selectedPatient, queue.prescription);
+    }
+  };
+
+  // ========================================================================
+
   const handleSelectPatientWithTimer = (patient) => {
     queue.handleSelectPatient(patient);
-    if (patient.status === PATIENT_STATUS.IN_CONSULTATION && !queue.consultationStartTime) {
+    if (
+      patient.status === PATIENT_STATUS.IN_CONSULTATION &&
+      !queue.consultationStartTime
+    ) {
       queue.setConsultationStartTime(Date.now());
     }
   };
 
-  // Calling the next patient also flips the queue filter to "In
-  // Consult" so the doctor immediately sees where that patient landed.
   const handleCallNext = async () => {
     const result = await queue.handleCallNextPatient();
     if (result.calledPatient) setQueueFilter(PATIENT_STATUS.IN_CONSULTATION);
@@ -86,10 +324,13 @@ export default function DoctorDashboard() {
     setTimeout(() => setCopiedFhir(false), 2000);
   };
 
-  const formatTime = (isoString) => {
-    if (!isoString) return "N/A";
-    return new Date(isoString).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
+  const formatTime = (isoString) =>
+    isoString
+      ? new Date(isoString).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : "N/A";
 
   const getDynamicWaitTime = (createdAt) => {
     if (!createdAt) return "N/A";
@@ -101,33 +342,12 @@ export default function DoctorDashboard() {
   const getElapsedConsultationTime = () => {
     if (!queue.consultationStartTime) return "00:00";
     const diffSecs = Math.floor((now - queue.consultationStartTime) / 1000);
-    const mins = String(Math.floor(diffSecs / 60)).padStart(2, "0");
-    const secs = String(diffSecs % 60).padStart(2, "0");
-    return `${mins}:${secs}`;
+    return `${String(Math.floor(diffSecs / 60)).padStart(2, "0")}:${String(diffSecs % 60).padStart(2, "0")}`;
   };
-
-  // --- Analytics derived data ---
-  const totalFootfall = queue.patients.length;
-  const approvedCount = queue.patients.filter((p) => p.status === PATIENT_STATUS.APPROVED).length;
-  const redFlagCount = queue.patients.filter((p) => p.is_red_flag).length;
-  const abhaLinkedCount = queue.patients.filter((p) => p.abha_id && p.abha_id !== "Not Linked").length;
-
-  const averageDosha = (index, fallback) =>
-    totalFootfall
-      ? Math.round(
-          queue.patients.reduce((sum, p) => sum + (p.dosha_data?.[index]?.value ?? 50), 0) / totalFootfall,
-        )
-      : fallback;
-
-  const doshaBarData = [
-    { name: "Vata (Air)", value: averageDosha(0, 65) },
-    { name: "Pitta (Fire)", value: averageDosha(1, 55) },
-    { name: "Kapha (Earth)", value: averageDosha(2, 40) },
-  ];
 
   if (isLoadingSession) {
     return (
-      <div className="h-screen w-full flex items-center justify-center bg-slate-900 text-slate-400 text-sm">
+      <div className="h-screen w-full flex items-center justify-center bg-slate-900 text-slate-400">
         Checking session…
       </div>
     );
@@ -155,6 +375,7 @@ export default function DoctorDashboard() {
             selectedPatient={queue.selectedPatient}
             isEditing={queue.isEditing}
             caseNotes={queue.caseNotes}
+            prescription={queue.prescription}
             selectedDate={selectedDate}
             queueFilter={queueFilter}
             searchQuery={searchQuery}
@@ -165,9 +386,16 @@ export default function DoctorDashboard() {
             onSelectPatient={handleSelectPatientWithTimer}
             onCallNextPatient={handleCallNext}
             onChangeCaseNotes={queue.setCaseNotes}
-            onToggleEdit={() => (queue.isEditing ? queue.handleSaveNotes() : queue.setIsEditing(true))}
-            onApprove={queue.handleApprove}
-            onDownloadReport={() => downloadClinicalReport(queue.selectedPatient, queue.caseNotes)}
+            onChangePrescription={queue.setPrescription}
+            onToggleEdit={() =>
+              queue.isEditing
+                ? queue.handleSaveNotes()
+                : queue.setIsEditing(true)
+            }
+            onApprove={handleApproveAndGenerateRx}
+            onDownloadReport={() =>
+              downloadClinicalReport(queue.selectedPatient, queue.caseNotes)
+            }
             onOpenFhirModal={() => setShowFhirModal(true)}
             onOpenDocViewer={() => setShowDocViewer(true)}
             formatTime={formatTime}
@@ -178,12 +406,16 @@ export default function DoctorDashboard() {
 
         {activeTab === "analytics" && (
           <AnalyticsPanel
-            totalFootfall={totalFootfall}
-            approvedCount={approvedCount}
-            redFlagCount={redFlagCount}
-            abhaLinkedCount={abhaLinkedCount}
+            totalFootfall={analyticsFootfall}
+            approvedCount={analyticsApproved}
+            redFlagCount={analyticsRedFlag}
+            abhaLinkedCount={analyticsAbha}
             doshaBarData={doshaBarData}
+            topComplaints={getTopComplaints()}
+            demographics={getDemographics()}
+            peakHours={getPeakHours()}
             isDarkMode={isDarkMode}
+            onExportCSV={exportMinistryReport}
           />
         )}
       </div>
@@ -199,7 +431,10 @@ export default function DoctorDashboard() {
       )}
 
       {showDocViewer && (
-        <DocumentViewerModal patient={queue.selectedPatient} onClose={() => setShowDocViewer(false)} />
+        <DocumentViewerModal
+          patient={queue.selectedPatient}
+          onClose={() => setShowDocViewer(false)}
+        />
       )}
     </div>
   );

@@ -13,6 +13,7 @@ import {
   FileDown,
   Code2,
   Timer,
+  Printer,
   Image as ImageIcon,
 } from "lucide-react";
 import {
@@ -25,13 +26,12 @@ import {
 } from "recharts";
 import { DOSHA_INFO } from "../dashboard-data/doshaInfo";
 import { PATIENT_STATUS } from "../dashboard-data/patientStatus";
-// Module B: shared clinical-timeline component, not page-specific —
-// lives in the app-wide src/components/ folder alongside other
-// cross-page building blocks (adjust this path if your project
-// structure differs).
 import ClinicalTimeline from "../../components/ClinicalTimeline";
 
 /**
+ * ============================================================================
+ * PATIENT DETAIL PANEL
+ * ============================================================================
  * Right-hand panel: the full clinical record for whichever patient is
  * currently selected in the queue, plus the doctor's available actions
  * (edit notes, approve, print report, export FHIR, view original scans).
@@ -39,7 +39,9 @@ import ClinicalTimeline from "../../components/ClinicalTimeline";
 export default function PatientDetailPanel({
   patient,
   caseNotes,
+  prescription, // NEW: eRx state
   onChangeCaseNotes,
+  onChangePrescription, // NEW: eRx setter
   isEditing,
   onToggleEdit,
   onApprove,
@@ -74,7 +76,11 @@ export default function PatientDetailPanel({
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 dark:border-slate-800 pb-4 gap-3">
         <div>
           <h2 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
-            <FileText className="text-blue-600 dark:text-blue-500" size={20} aria-hidden="true" />{" "}
+            <FileText
+              className="text-blue-600 dark:text-blue-500"
+              size={20}
+              aria-hidden="true"
+            />{" "}
             Clinical Summary
           </h2>
           <div className="flex items-center gap-3 mt-1 text-xs font-bold">
@@ -84,8 +90,8 @@ export default function PatientDetailPanel({
             <span className="text-gray-300 dark:text-slate-600">|</span>
             {patient.status === PATIENT_STATUS.IN_CONSULTATION ? (
               <span className="text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/40 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Timer size={12} className="animate-pulse" aria-hidden="true" /> Active:{" "}
-                {getElapsedConsultationTime()}
+                <Timer size={12} className="animate-pulse" aria-hidden="true" />{" "}
+                Active: {getElapsedConsultationTime()}
               </span>
             ) : (
               <span
@@ -129,7 +135,11 @@ export default function PatientDetailPanel({
                 : "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700"
             }`}
           >
-            {isEditing ? <Save size={14} aria-hidden="true" /> : <Edit2 size={14} aria-hidden="true" />}{" "}
+            {isEditing ? (
+              <Save size={14} aria-hidden="true" />
+            ) : (
+              <Edit2 size={14} aria-hidden="true" />
+            )}{" "}
             {isEditing ? "Save" : "Edit"}
           </button>
 
@@ -144,7 +154,9 @@ export default function PatientDetailPanel({
             }`}
           >
             <Check size={14} aria-hidden="true" />{" "}
-            {patient.status === PATIENT_STATUS.APPROVED ? "Approved" : "Approve Case"}
+            {patient.status === PATIENT_STATUS.APPROVED
+              ? "Approved"
+              : "Approve & Print eRx"}
           </button>
         </div>
       </div>
@@ -189,7 +201,11 @@ export default function PatientDetailPanel({
             </p>
             <span className="text-gray-300 dark:text-slate-700">|</span>
             <p className="text-xs text-gray-600 dark:text-slate-300 font-bold flex items-center gap-1">
-              <Calendar size={12} className="text-blue-500" aria-hidden="true" />{" "}
+              <Calendar
+                size={12}
+                className="text-blue-500"
+                aria-hidden="true"
+              />{" "}
               {new Date(patient.created_at).toLocaleDateString()}
             </p>
             <p className="text-xs text-gray-600 dark:text-slate-300 font-bold flex items-center gap-1">
@@ -272,8 +288,11 @@ export default function PatientDetailPanel({
 
         <div className="bg-slate-50 dark:bg-slate-800/30 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 mt-3">
           <p className="text-xs text-slate-600 dark:text-slate-400 break-words">
-            <span className="font-bold text-slate-800 dark:text-slate-200">Raw AI Inference Notes: </span>
-            {patient.extracted_doc_notes || "No prior records attached during this session."}
+            <span className="font-bold text-slate-800 dark:text-slate-200">
+              Raw AI Inference Notes:{" "}
+            </span>
+            {patient.extracted_doc_notes ||
+              "No prior records attached during this session."}
           </p>
         </div>
       </div>
@@ -282,8 +301,8 @@ export default function PatientDetailPanel({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-amber-50/60 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-200 dark:border-amber-900/30">
           <span className="text-[11px] font-bold text-amber-900 dark:text-amber-500 flex items-center gap-1">
-            <Flame size={14} className="flex-shrink-0" aria-hidden="true" /> Agni Pariksha (Digestive
-            Fire)
+            <Flame size={14} className="flex-shrink-0" aria-hidden="true" />{" "}
+            Agni Pariksha (Digestive Fire)
           </span>
           <p className="text-xs text-amber-800 dark:text-amber-200 mt-1 break-words">
             {patient.agni_status || "Samagni"}
@@ -291,7 +310,8 @@ export default function PatientDetailPanel({
         </div>
         <div className="bg-indigo-50/60 dark:bg-indigo-900/10 p-3 rounded-xl border border-indigo-200 dark:border-indigo-900/30">
           <span className="text-[11px] font-bold text-indigo-900 dark:text-indigo-400 flex items-center gap-1">
-            <Activity size={14} className="flex-shrink-0" aria-hidden="true" /> Koshtha (Bowel Habit)
+            <Activity size={14} className="flex-shrink-0" aria-hidden="true" />{" "}
+            Koshtha (Bowel Habit)
           </span>
           <p className="text-xs text-indigo-800 dark:text-indigo-200 mt-1 break-words">
             {patient.koshtha_status || "Madhyama Koshtha"}
@@ -299,8 +319,8 @@ export default function PatientDetailPanel({
         </div>
         <div className="bg-emerald-50/60 dark:bg-emerald-900/10 p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/30">
           <span className="text-[11px] font-bold text-emerald-900 dark:text-emerald-500 flex items-center gap-1">
-            <Apple size={14} className="flex-shrink-0" aria-hidden="true" /> Ahara-Vihara (Diet &
-            Lifestyle)
+            <Apple size={14} className="flex-shrink-0" aria-hidden="true" />{" "}
+            Ahara-Vihara (Diet & Lifestyle)
           </span>
           <p className="text-xs text-emerald-800 dark:text-emerald-200 mt-1 break-words">
             {patient.ahara_vihara || "Balanced routine"}
@@ -308,7 +328,7 @@ export default function PatientDetailPanel({
         </div>
       </div>
 
-      {/* Dosha radar chart */}
+      {/* Dosha radar chart AND Progress Bars (Fully Restored!) */}
       <div className="bg-blue-50/40 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30">
         <h4 className="text-xs font-bold uppercase text-gray-700 dark:text-slate-300 mb-3">
           Ayurvedic Vikriti Triaging (Dosha Imbalance)
@@ -316,14 +336,35 @@ export default function PatientDetailPanel({
         <div className="flex flex-col md:flex-row items-center gap-4">
           <div className="h-48 w-full md:w-1/2">
             <ResponsiveContainer width="100%" height="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="65%" data={patient.dosha_data}>
+              <RadarChart
+                cx="50%"
+                cy="50%"
+                outerRadius="65%"
+                data={patient.dosha_data}
+              >
                 <PolarGrid stroke={isDarkMode ? "#334155" : "#e5e7eb"} />
                 <PolarAngleAxis
                   dataKey="subject"
-                  tick={{ fill: isDarkMode ? "#cbd5e1" : "#374151", fontSize: 11, fontWeight: 700 }}
+                  tick={{
+                    fill: isDarkMode ? "#cbd5e1" : "#374151",
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
                 />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                <Radar name="Imbalance" dataKey="value" stroke="#2563eb" strokeWidth={2} fill="#3b82f6" fillOpacity={0.4} />
+                <PolarRadiusAxis
+                  angle={30}
+                  domain={[0, 100]}
+                  tick={false}
+                  axisLine={false}
+                />
+                <Radar
+                  name="Imbalance"
+                  dataKey="value"
+                  stroke="#2563eb"
+                  strokeWidth={2}
+                  fill="#3b82f6"
+                  fillOpacity={0.4}
+                />
               </RadarChart>
             </ResponsiveContainer>
           </div>
@@ -344,20 +385,74 @@ export default function PatientDetailPanel({
                         {info.subtitle}
                       </span>
                     </span>
-                    <span className="font-bold text-gray-600 dark:text-slate-400">{item.value}%</span>
+                    <span className="font-bold text-gray-600 dark:text-slate-400">
+                      {item.value}%
+                    </span>
                   </div>
                   <div className="w-full h-1.5 bg-gray-200 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                    <div className={`h-full rounded-full ${info.colorClass}`} style={{ width: `${item.value}%` }} />
+                    <div
+                      className={`h-full rounded-full ${info.colorClass}`}
+                      style={{ width: `${item.value}%` }}
+                    />
                   </div>
                   <p className="text-[10px] text-gray-500 dark:text-slate-400 italic break-words">
                     <span aria-hidden="true">💡</span>{" "}
-                    <strong className="text-gray-700 dark:text-slate-300">{info.desc.split("(")[0]}</strong>(
-                    {info.desc.split("(")[1]}
+                    <strong className="text-gray-700 dark:text-slate-300">
+                      {info.desc.split("(")[0]}
+                    </strong>
+                    ({info.desc.split("(")[1]}
                   </p>
                 </div>
               );
             })}
           </div>
+        </div>
+      </div>
+
+      {/* ============================================================================ */}
+      {/* NEW: DIGITAL E-PRESCRIPTION PAD                                              */}
+      {/* ============================================================================ */}
+      <div className="mt-8 bg-indigo-50/40 dark:bg-indigo-900/10 p-5 rounded-xl border border-indigo-200 dark:border-indigo-900/30">
+        <h4 className="text-sm font-black uppercase text-indigo-800 dark:text-indigo-400 mb-3 flex items-center gap-2">
+          <span
+            className="text-xl font-serif text-indigo-600 dark:text-indigo-500"
+            aria-hidden="true"
+          >
+            Rx
+          </span>
+          Digital E-Prescription
+        </h4>
+        <textarea
+          className="w-full p-4 text-sm text-gray-800 dark:text-white bg-white dark:bg-slate-950 border border-indigo-200 dark:border-indigo-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner resize-y min-h-[120px]"
+          placeholder="Type prescribed medications, dosages, and Ayush lifestyle advice here..."
+          value={prescription || ""}
+          onChange={(e) => onChangePrescription(e.target.value)}
+          disabled={patient.status === PATIENT_STATUS.APPROVED}
+        />
+
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={onApprove}
+            disabled={patient.status === PATIENT_STATUS.APPROVED}
+            className={`w-full flex items-center justify-center gap-2 py-4 rounded-xl font-black text-sm text-white shadow-lg transition-all ${
+              patient.status === PATIENT_STATUS.APPROVED
+                ? "bg-green-600 dark:bg-green-700 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700 hover:-translate-y-0.5 active:scale-95 shadow-indigo-600/30 hover:shadow-indigo-600/40"
+            }`}
+          >
+            {patient.status === PATIENT_STATUS.APPROVED ? (
+              <>
+                <Check size={18} aria-hidden="true" /> eRx Generated & Case
+                Approved
+              </>
+            ) : (
+              <>
+                <Printer size={18} aria-hidden="true" /> Approve Case & Print
+                eRx
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

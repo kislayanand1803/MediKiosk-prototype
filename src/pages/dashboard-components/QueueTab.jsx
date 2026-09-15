@@ -3,15 +3,16 @@ import PatientQueueList from "./PatientQueueList";
 import PatientDetailPanel from "./PatientDetailPanel";
 
 /**
- * Layout for the "Live Queue" tab: the patient list on the left, and
- * either an empty-state placeholder or the selected patient's full
- * record on the right, depending on whether a patient is selected.
+ * ============================================================================
+ * QUEUE TAB LAYOUT
+ * ============================================================================
  */
 export default function QueueTab({
   patients,
   selectedPatient,
   isEditing,
   caseNotes,
+  prescription, // NEW: Inherit state
   selectedDate,
   queueFilter,
   searchQuery,
@@ -22,6 +23,7 @@ export default function QueueTab({
   onSelectPatient,
   onCallNextPatient,
   onChangeCaseNotes,
+  onChangePrescription, // NEW: Inherit setter
   onToggleEdit,
   onApprove,
   onDownloadReport,
@@ -50,8 +52,14 @@ export default function QueueTab({
 
       {!selectedPatient ? (
         <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 h-full flex flex-col items-center justify-center text-gray-400 dark:text-slate-500 bg-gray-50/50 dark:bg-slate-900/50 transition-colors duration-200">
-          <Stethoscope size={48} className="mb-4 text-gray-300 dark:text-slate-700" aria-hidden="true" />
-          <p className="text-lg font-bold text-gray-500 dark:text-slate-400">No Patient Selected</p>
+          <Stethoscope
+            size={48}
+            className="mb-4 text-gray-300 dark:text-slate-700"
+            aria-hidden="true"
+          />
+          <p className="text-lg font-bold text-gray-500 dark:text-slate-400">
+            No Patient Selected
+          </p>
           <p className="text-sm mt-1 text-center">
             Select a patient from the queue or change the date to view records.
           </p>
@@ -60,7 +68,9 @@ export default function QueueTab({
         <PatientDetailPanel
           patient={selectedPatient}
           caseNotes={caseNotes}
+          prescription={prescription}
           onChangeCaseNotes={onChangeCaseNotes}
+          onChangePrescription={onChangePrescription}
           isEditing={isEditing}
           onToggleEdit={onToggleEdit}
           onApprove={onApprove}
