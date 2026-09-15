@@ -20,9 +20,9 @@ In India's public and AYUSH hospitals, the doctor-to-patient consultation time i
 
 ### 🔗 Useful Links
 
-- 🌐 **Live Demo:** [Insert Vercel Link Here]
+- 🌐 **Live Demo:** https://medi-kiosk-prototype.vercel.app/
 - 🏗️ **System Architecture & Security Specs:** [Read ARCHITECTURE.md](./ARCHITECTURE.md)
-- 📺 **Video Pitch / Walkthrough:** [Insert YouTube Link Here]
+- 📺 **Video Pitch / Walkthrough:** NA
 
 ---
 
@@ -37,7 +37,12 @@ In India's public and AYUSH hospitals, the doctor-to-patient consultation time i
   - Clinical notes are mapped to international **HL7 FHIR R4** standards.
   - **DPDP Act 2023 Compliant:** Features audio-guided consent and an aggressive stateless volatile memory-wiping protocol to sanitize the kiosk after every patient.
 
-- 👨‍⚕️ **Live Physician Dashboard (Module E):** Real-time queue management powered by Supabase. Doctors view an AI-generated SOAP summary, a chronological medical timeline, AYUSH Dosha/Agni radar charts, and can manually verify AI data against the original physical scans side-by-side.
+- 👨‍⚕️ **Live Physician Dashboard & eRx (Module E):** Real-time queue management powered by Supabase. Doctors view an AI-generated SOAP summary, a chronological medical timeline, and AYUSH Dosha/Agni radar charts. With a single click, the physician can approve the case and generate a **Digital E-Prescription (eRx) PDF** containing the hospital's branding, patient stats, and prescribed lifestyle interventions.
+
+- 📊 **Ayush Ministry Command Center (Module F):** A global historical telemetry dashboard designed for hospital administrators and government officials. Features include:
+  - **Syndromic Surveillance:** An NLP heuristic tracking the top 5 chief complaints across the facility.
+  - **Operational Throughput:** A 24-hour heatmap identifying OPD congestion bottlenecks.
+  - **Global Data Export:** Instant CSV export capability of all facility data for Ministry-level disease tracking and compliance auditing.
 
 ---
 
