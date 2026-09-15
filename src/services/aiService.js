@@ -2,9 +2,16 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { supabase } from "./supabaseClient";
 import { generateFHIRBundle } from "../utils/fhirMapper";
 
-// ---------------------------------------------------------
-// MODEL FALLBACK CHAIN
-// ---------------------------------------------------------
+// =========================================================
+// 1. GLOBAL MEMORY OPTIMIZATION
+// =========================================================
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+if (!apiKey) console.warn("🚨 VITE_GEMINI_API_KEY is missing!");
+const globalAiClient = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
+// =========================================================
+// MODEL FALLBACK CHAIN & TIMEOUT
+// =========================================================
 const MODEL_FALLBACK_CHAIN = [
   "gemini-3.1-flash-lite",
   "gemini-3.6-flash",
@@ -14,17 +21,29 @@ const MODEL_FALLBACK_CHAIN = [
   "gemini-3-flash",
 ];
 
-async function executeWithModelFallback(aiClient, promptParts, config) {
+// INCREASED TIMEOUT: 30 seconds allows multimodal OCR & schema processing
+const timeoutPromise = (ms) =>
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`API Timeout after ${ms}ms`)), ms),
+  );
+
+async function executeWithModelFallback(promptParts, config) {
+  if (!globalAiClient) throw new Error("🚨 VITE_GEMINI_API_KEY is missing!");
+
   let lastError = null;
 
   for (const modelName of MODEL_FALLBACK_CHAIN) {
     try {
       console.log(`Attempting generation with model: ${modelName}`);
-      const response = await aiClient.models.generateContent({
+
+      const request = globalAiClient.models.generateContent({
         model: modelName,
         contents: [{ role: "user", parts: promptParts }],
         config: config,
       });
+
+      // 30,000ms ensures multimodal documents have ample time to process
+      const response = await Promise.race([request, timeoutPromise(30000)]);
       console.log(`✅ Success with model: ${modelName}`);
       return response;
     } catch (error) {
@@ -35,9 +54,28 @@ async function executeWithModelFallback(aiClient, promptParts, config) {
   throw lastError || new Error("All fallback models failed.");
 }
 
-// ---------------------------------------------------------
+// =========================================================
+// BRITTLE JSON PARSING FIX
+// =========================================================
+function safeJsonParse(rawText) {
+  try {
+    let cleanText = rawText || "{}";
+    cleanText = cleanText
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
+      .trim();
+    // Regex fix for trailing commas before closing brackets
+    cleanText = cleanText.replace(/,\s*([\]}])/g, "$1");
+    return JSON.parse(cleanText);
+  } catch (error) {
+    console.error("JSON Parsing failed. Raw Text:", rawText);
+    throw new Error("Malformed JSON received from LLM.");
+  }
+}
+
+// =========================================================
 // CLINICAL SAFETY: Deterministic Red Flag Scanner
-// ---------------------------------------------------------
+// =========================================================
 export const RED_FLAG_PATTERNS = {
   explicit_patient_emergency_override: [
     "system: patient confirmed critical emergency",
@@ -132,46 +170,33 @@ export function deterministicRedFlagCheck(chatHistory) {
 }
 
 /**
- * --------------------------------------------------------------------------
+ * =========================================================
  * SECURE TOKEN GENERATOR
- * --------------------------------------------------------------------------
- * Queries Supabase for today's total patient count to securely generate
- * sequential tokens (e.g., TKN-001) before the record is saved.
+ * =========================================================
  */
 async function getNextToken() {
   try {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const { count, error } = await supabase
-      .from("patients")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", startOfToday.toISOString());
+    const { data, error } = await supabase.rpc("get_next_daily_token");
     if (error) throw error;
-    const sequenceNum = (count || 0) + 1;
-    return `TKN-${String(sequenceNum).padStart(3, "0")}`;
+    return data;
   } catch (err) {
-    console.error("Token generation error:", err);
-    return `TKN-${Math.floor(Math.random() * 900) + 100}`;
+    console.error("Token generation RPC error:", err);
+    return `TKN-F${Math.floor(Math.random() * 900) + 100}`;
   }
 }
 
-// ---------------------------------------------------------
+// =========================================================
 // CORE AI ENGINE (CLINICAL & AYUSH TRIAGE SUMMARY)
-// ---------------------------------------------------------
+// =========================================================
 export async function generateMedicalCaseSummary(
   patientInfo,
   chatHistory,
-  // MODULE B: Updated to accept an array of documents (PDFs/Images)
   uploadedDocs = [],
   language = "English",
 ) {
   try {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) throw new Error("🚨 VITE_GEMINI_API_KEY is missing!");
-
     const deterministicFlags = deterministicRedFlagCheck(chatHistory);
     const hasDeterministicRedFlag = deterministicFlags.length > 0;
-    const ai = new GoogleGenAI({ apiKey: apiKey });
 
     const languageInstruction = `Provide all descriptive text summaries in clear, professional medical English for the doctor portal, while accurately translating the patient's ${language} input.
     
@@ -204,29 +229,25 @@ CRITICAL CLINICAL & AYUSH TRIAGING DIRECTIVES:
    - vataScore, pittaScore, and kaphaScore MUST be integers between 0 and 100 representing current pathological imbalance.
    - Normal baseline: 15-30%
    - Moderate aggravation: 45-65%
-   - Acute / severe pathological aggravation (e.g. sharp pain, abscess, severe constipation, inflammation): 70-95%
-   - DO NOT provide single-digit numbers (like 7 or 8) for active symptoms.
+   - Acute / severe pathological aggravation: 70-95%
 
 2. AYUSH CLINICAL PARIKSHA:
-   - Identify Agni status: Vishamagni (irregular), Tikshnagni (hyperactive), Mandagni (sluggish), or Samagni (balanced).
-   - Identify Koshtha status: Krura Koshtha (hard/constipated bowels), Mridu Koshtha (loose/fast bowels), or Madhyama Koshtha (regular bowels).
+   - Identify Agni status: Vishamagni, Tikshnagni, Mandagni, or Samagni.
+   - Identify Koshtha status: Krura Koshtha, Mridu Koshtha, or Madhyama Koshtha.
    - Provide Ahara-Vihara (dietary and lifestyle) guidance.
 
 3. ACUTE OCR & SURGICAL RED-FLAG OVERRIDE:
-   - If the attached document image or OCR shows acute structural/pathological findings (such as hepatic abscess, internal organ inflammation, hemangioma risks, perforation, acute abdomen, or sepsis), you MUST set isRedFlag to true and urgencyLevel to "Urgent".
+   - If the document image shows acute structural/pathological findings, set isRedFlag to true and urgencyLevel to "Urgent".
 
 4. MODULE B DOCUMENT DIGITIZATION (CLINICAL ENTITY PARSING):
-   - You MUST extract medications, lab values, and timeline events from BOTH the patient transcript and any attached OCR images.
-   - Format them into structured JSON arrays as defined by the schema.
+   - Extract medications, lab values, and timeline events from BOTH the transcript and attached OCR images into JSON arrays.
 
 ${languageInstruction}`,
       },
     ];
 
-    // MODULE B: Multi-document Gemini Vision Injection
     if (uploadedDocs && uploadedDocs.length > 0) {
       uploadedDocs.forEach((doc) => {
-        // Strip the Base64 URI header before sending to Gemini
         const cleanBase64 = doc.base64.replace(/^data:(.*);base64,/, "");
         parts.push({
           inlineData: { mimeType: doc.type || "image/jpeg", data: cleanBase64 },
@@ -237,7 +258,7 @@ ${languageInstruction}`,
     const config = {
       temperature: 0.1,
       systemInstruction:
-        "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician. You must read uploaded medical documents and extract structured entities (meds, labs, timeline) accurately.",
+        "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician. Extract structured entities accurately.",
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -246,7 +267,6 @@ ${languageInstruction}`,
           symptomsSummary: { type: Type.STRING },
           possibleDiagnosis: { type: Type.STRING },
           extractedDocNotes: { type: Type.STRING },
-          // MODULE B: Structured JSON Schema for OCR Extraction
           medications: {
             type: Type.ARRAY,
             items: {
@@ -311,15 +331,8 @@ ${languageInstruction}`,
       },
     };
 
-    const response = await executeWithModelFallback(ai, parts, config);
-
-    let cleanText = response.text || "{}";
-    cleanText = cleanText
-      .replace(/```json/gi, "")
-      .replace(/```/g, "")
-      .trim();
-
-    const parsedData = JSON.parse(cleanText);
+    const response = await executeWithModelFallback(parts, config);
+    const parsedData = safeJsonParse(response.text);
 
     const finalIsRedFlag = hasDeterministicRedFlag || parsedData.isRedFlag;
     const finalUrgency = hasDeterministicRedFlag
@@ -328,7 +341,7 @@ ${languageInstruction}`,
 
     const generatedToken = await getNextToken();
 
-    // Construct the primary database object, now including Module B JSON arrays
+    // STRICT MATCH: Only schema-existing columns are included
     const baseCaseData = {
       name: patientInfo?.name || "Rahul Sharma",
       age: patientInfo?.age || "28",
@@ -341,13 +354,10 @@ ${languageInstruction}`,
       subjective_history: parsedData.symptomsSummary,
       possible_diagnosis: parsedData.possibleDiagnosis,
       extracted_doc_notes: parsedData.extractedDocNotes,
-
-      // MODULE B: Mapping extracted arrays to Supabase columns
       medications: parsedData.medications || [],
       lab_values: parsedData.labValues || [],
       timeline: parsedData.timeline || [],
-      document_images: uploadedDocs || [], // Store original documents for Doctor verification
-
+      document_images: uploadedDocs || [],
       agni_status: parsedData.agniStatus,
       koshtha_status: parsedData.koshthaStatus,
       ahara_vihara: parsedData.aharaVihara,
@@ -359,23 +369,26 @@ ${languageInstruction}`,
         { subject: "Kapha", value: parsedData.kaphaScore },
       ],
       token_number: generatedToken,
-      status: "Pending",
+      status: "Waiting",
     };
 
     const fhirPayload = generateFHIRBundle(baseCaseData);
-
-    const finalCaseData = {
-      ...baseCaseData,
-      fhir_bundle: fhirPayload,
-    };
+    const finalCaseData = { ...baseCaseData, fhir_bundle: fhirPayload };
 
     const { data: dbData, error: dbError } = await supabase
       .from("patients")
       .insert([finalCaseData])
       .select();
-    if (dbError) console.error("Error saving patient to Supabase:", dbError);
 
-    return { ...finalCaseData, id: dbData?.[0]?.id };
+    if (dbError) {
+      console.error(
+        "Error saving patient to Supabase:",
+        dbError.message,
+        dbError.details,
+      );
+    }
+
+    return { ...finalCaseData, ...(dbData?.[0] || {}) };
   } catch (apiError) {
     console.warn(
       "⚠️ All models in fallback chain failed. Engaging demo fallback mode:",
@@ -397,8 +410,6 @@ ${languageInstruction}`,
         "🗣️ Patient reports intense throbbing headache and sour belching.",
       possible_diagnosis: "🤖 Vata-Pitta Shiroroga / Migraine",
       extracted_doc_notes: "📄 Prior prescription OCR: Paracetamol 650mg SOS.",
-
-      // MODULE B: Fallback arrays for robust demo
       medications: [
         { drugName: "Paracetamol", dosage: "650mg", duration: "SOS" },
       ],
@@ -409,8 +420,7 @@ ${languageInstruction}`,
         { date: "2 days ago", event: "Fever and throbbing headache started" },
         { date: "Yesterday", event: "Took Paracetamol 650mg" },
       ],
-      document_images: uploadedDocs || [], // Store original documents for Doctor verification
-
+      document_images: uploadedDocs || [],
       agni_status: "Vishamagni (Irregular digestion)",
       koshtha_status: "Krura Koshtha (Hard/Constipated bowels)",
       ahara_vihara: "Irregular diet and erratic sleep schedule.",
@@ -422,7 +432,7 @@ ${languageInstruction}`,
         { subject: "Kapha", value: 35 },
       ],
       token_number: fallbackToken,
-      status: "Pending",
+      status: "Waiting",
     };
 
     const fallbackFhirPayload = generateFHIRBundle(fallbackData);
@@ -435,35 +445,37 @@ ${languageInstruction}`,
       .from("patients")
       .insert([finalFallbackData])
       .select();
-    if (fbError)
-      console.error("Error saving fallback patient to Supabase:", fbError);
-    return { ...finalFallbackData, id: fbData?.[0]?.id };
+
+    if (fbError) {
+      console.error(
+        "Error saving fallback patient to Supabase:",
+        fbError.message,
+        fbError.details,
+      );
+    }
+
+    return { ...finalFallbackData, ...(fbData?.[0] || {}) };
   }
 }
 
-// ---------------------------------------------------------
-// DYNAMIC CHAT AI ENGINE (OPD KIOSK CONTEXT & EMERGENCY SAFEGUARDS)
-// ---------------------------------------------------------
+// =========================================================
+// DYNAMIC CHAT AI ENGINE
+// =========================================================
 export async function generateNextChatResponse(
   chatHistory,
   step,
   language = "English",
 ) {
   try {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) throw new Error("API Key missing from .env file");
-
     const latestPatientMsg =
       [...chatHistory].reverse().find((m) => m.sender === "user")?.text || "";
     const deterministicFindings = deterministicRedFlagCheck(latestPatientMsg);
 
-    const ai = new GoogleGenAI({ apiKey: apiKey });
     const historyText = chatHistory
       .map((m) => `${m.sender === "ai" ? "Doctor" : "Patient"}: ${m.text}`)
       .join("\n");
 
     let clinicalDirective = "";
-
     switch (step) {
       case 1:
         clinicalDirective = `PHASE 1: Chief Complaint. Ask ONE focused clinical follow-up question to narrow down the reported symptom location or onset.`;
@@ -491,24 +503,15 @@ CRITICAL SAFETY & ROLE RULES:
 3. The patient is standing or seated right in front of this kiosk in the clinic.`;
 
     const emergencyDirective = `CRITICAL RED FLAG & SYNCOPE PROTOCOL:
-If the patient reports symptoms indicating an acute medical emergency (e.g., active radiating chest pain, feeling faint, about to collapse, severe breathing distress, coughing blood):
+If the patient reports symptoms indicating an acute medical emergency:
 - You MUST set "critical_symptom_detected" to true IMMEDIATELY.
-- In "question", output a concise, urgent warning directing the patient to alert the hospital staff immediately (e.g., "CRITICAL: Please alert the nursing desk or hospital staff at this counter immediately for emergency assistance.").
+- In "question", output a concise, urgent warning directing the patient to alert the hospital staff immediately.
 - DO NOT continue asking conversational routine intake questions.
 - DO NOT ask questions about locking doors or dispatching vehicles.`;
 
     const langInstruction = `CRITICAL LANGUAGE REQUIREMENT: Output the response JSON entirely in fluent ${language} script and vocabulary.`;
 
-    const prompt = `${kioskContextDirective}
-${clinicalDirective}
-${emergencyDirective}
-${langInstruction}
-
-Conversation History:
-${historyText}
-
-Generate the next response in ${language}. Keep the question under 2 sentences.
-Provide 3 short, clinically relevant quick-reply options in ${language}.`;
+    const prompt = `${kioskContextDirective}\n${clinicalDirective}\n${emergencyDirective}\n${langInstruction}\n\nConversation History:\n${historyText}\n\nGenerate the next response in ${language}. Keep the question under 2 sentences.\nProvide 3 short, clinically relevant quick-reply options in ${language}.`;
 
     const config = {
       temperature: 0.2,
@@ -524,19 +527,8 @@ Provide 3 short, clinically relevant quick-reply options in ${language}.`;
       },
     };
 
-    const response = await executeWithModelFallback(
-      ai,
-      [{ text: prompt }],
-      config,
-    );
-
-    let cleanText = response.text || "{}";
-    cleanText = cleanText
-      .replace(/```json/gi, "")
-      .replace(/```/g, "")
-      .trim();
-
-    const parsed = JSON.parse(cleanText);
+    const response = await executeWithModelFallback([{ text: prompt }], config);
+    const parsed = safeJsonParse(response.text);
 
     if (deterministicFindings.length > 0) {
       parsed.critical_symptom_detected = true;
