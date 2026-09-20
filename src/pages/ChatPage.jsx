@@ -708,14 +708,22 @@ export default function ChatPage() {
             )}
 
             {step === 1 && !isAiThinking && !isEmergencyLocked && (
-              <div className="block lg:hidden mt-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[320px]">
-                <h3 className="text-[13px] font-bold text-center mb-1 text-slate-700 shrink-0">
+              <div className="block lg:hidden mt-2 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="text-[13px] font-bold text-center mb-2 text-slate-700">
                   {t("whereDoesItHurt")}
                 </h3>
-                {/* FIX: Forced height constraint (!h-full) prevents aspect-ratio blowout and clipping */}
-                <div className="flex-1 w-full h-full relative flex items-center justify-center overflow-hidden [&>div]:h-full [&>div]:flex [&>div]:items-center [&_svg]:!h-full [&_svg]:!w-auto [&_svg]:max-h-[250px]">
-                  <BodyMapSelector onSelect={processMessage} />
-                </div>
+                {/*
+                  No fixed height, no overflow-hidden, no selector hacks
+                  reaching into BodyMapSelector's internals. The card sizes
+                  itself to whatever BodyMapSelector naturally needs
+                  (toggle + SVG + side-selector list + confirm button),
+                  and the message list this card lives inside — which is
+                  already `overflow-y-auto` — scrolls it into view exactly
+                  like it does every other message/card. Forcing this into
+                  a fixed 320px box was what clipped the Left/Both/Right
+                  buttons and caused the double-scroll before.
+                */}
+                <BodyMapSelector onSelect={processMessage} />
               </div>
             )}
 

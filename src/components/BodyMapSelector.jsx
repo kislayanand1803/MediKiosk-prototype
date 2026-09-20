@@ -129,8 +129,21 @@ export default function BodyMapSelector({ onSelect }) {
         />
       </div>
 
-      {/* NEW: Per-Muscle Laterality List */}
-      <div className="w-full max-h-[200px] overflow-y-auto scrollbar-thin pr-1 mt-2 space-y-2">
+      {/*
+        Per-Muscle Laterality List
+        --------------------------------------------------------------
+        Previously had its own `max-h-[200px] overflow-y-auto` — a
+        second, independent scroll region nested inside whatever
+        scrollable container this component itself sits in (the
+        desktop <aside>, or the mobile message list). That's the root
+        cause of the "double scroll" behavior on mobile: two separate
+        scrollbars stacked on top of each other. Removed in favor of
+        letting this list flow naturally — the ONE ancestor scroll
+        container (aside on desktop, message list on mobile) handles
+        scrolling it into view, exactly like it already handles
+        everything else around it.
+      */}
+      <div className="w-full pr-1 mt-2 space-y-2">
         <AnimatePresence>
           {selectedMuscles.map((muscle) => (
             <motion.div
