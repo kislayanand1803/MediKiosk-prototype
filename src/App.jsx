@@ -10,9 +10,12 @@ import VerifyPage from "./pages/VerifyPage";
 
 function App() {
   // 1. Check if the user has successfully entered the PIN this session
-  const [isUnlocked, setIsUnlocked] = useState(
-    sessionStorage.getItem("medikiosk_demo_auth") === "true",
-  );
+  //-- This state determines whether to show the Security Wall or the actual app
+  const [isUnlocked, setIsUnlocked] = useState(true);
+  // To enable the Security Wall, uncomment the following line and comment out the above line:
+  // const [isUnlocked, setIsUnlocked] = useState(
+  //   sessionStorage.getItem("medikiosk_demo_auth") === "true",
+  // );
 
   // 2. If locked, render ONLY the Security Wall. The router doesn't even exist yet.
   if (!isUnlocked) {
