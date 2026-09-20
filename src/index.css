@@ -27,7 +27,8 @@ body {
  */
 #root {
   width: 100%;
-  min-height: 100vh;
+  /* dvh (not vh) so this matches the h-[100dvh] shell used by full-screen pages like ChatPage.jsx and DoctorDashboard.jsx. vh and dvh can differ on mobile by the height of the browser's collapsible address bar — when #root (via vh) ends up taller than a page's own dvh-sized container, that leftover sliver makes the ENTIRE page scrollable at the browser level, on top of the page's own internal scroll region. That's what was dragging ChatPage's sticky header out of view: two independent scroll regions layered on top of each other. */
+  min-height: 100dvh;
 }
 
 body {
