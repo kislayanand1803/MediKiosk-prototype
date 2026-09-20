@@ -471,7 +471,6 @@ export default function ChatPage() {
   };
 
   return (
-    // FIX 1: Changed h-screen to h-[100dvh] to adapt to mobile browser toolbars
     <div className="h-[100dvh] w-full flex flex-col bg-white overflow-hidden font-sans">
       <AnimatePresence>
         {showEmergencyModal && !isEmergencyLocked && (
@@ -516,23 +515,23 @@ export default function ChatPage() {
         )}
       </AnimatePresence>
 
-      <header className="h-16 bg-[#0f3c31] text-white flex items-center justify-between px-4 sm:px-8 shrink-0 z-20 shadow-md border-b border-[#1a4f43]">
-        <div className="flex items-center gap-4">
+      <header className="h-14 sm:h-16 bg-[#0f3c31] text-white flex items-center justify-between px-3 sm:px-8 shrink-0 z-20 shadow-md border-b border-[#1a4f43]">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <button
             onClick={() => navigate("/intake")}
-            className="p-2 hover:bg-white/10 rounded-lg transition text-emerald-100 hidden sm:block"
+            className="p-1.5 hover:bg-white/10 rounded-lg transition text-emerald-100 hidden sm:block shrink-0"
             title="Back to Intake"
           >
             <ChevronLeft size={20} />
           </button>
-          <div className="bg-[#cd6b40] p-1.5 rounded-lg hidden sm:block">
+          <div className="bg-[#cd6b40] p-1.5 rounded-lg hidden sm:block shrink-0">
             <Bot size={20} className="text-white" />
           </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-[15px] leading-tight tracking-wide">
+          <div className="flex flex-col min-w-0 pr-2">
+            <span className="font-bold text-[14px] sm:text-[15px] leading-tight tracking-wide truncate">
               {t("chatHeaderTitle")}
             </span>
-            <span className="text-[11px] text-emerald-100/70">
+            <span className="text-[10px] sm:text-[11px] text-emerald-100/70 truncate">
               {t("patientLabel")}{" "}
               <strong className="text-white">{patientInfo.name}</strong> •{" "}
               {patientInfo.age}y • {patientInfo.gender}
@@ -540,7 +539,7 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-4 sm:gap-6">
+        <div className="flex items-center gap-2 sm:gap-6 shrink-0">
           <div className="hidden md:flex flex-col items-end mr-2">
             <span className="text-[10px] text-emerald-200/80 uppercase tracking-widest mb-1">
               {t("stepProgress", { current: step, total: TOTAL_STEPS })}
@@ -552,12 +551,15 @@ export default function ChatPage() {
               ></div>
             </div>
           </div>
-          <div className="flex items-center bg-[#1a4f43] border border-emerald-700/50 rounded-full px-2.5 py-1 text-xs">
-            <Globe size={14} className="text-emerald-200 mr-1.5 shrink-0" />
+          <div className="flex items-center bg-[#1a4f43] border border-emerald-700/50 rounded-full px-2 py-1 text-xs shrink-0">
+            <Globe
+              size={14}
+              className="text-emerald-200 mr-1 hidden sm:block shrink-0"
+            />
             <select
               value={currentLang}
               onChange={(e) => i18n.changeLanguage(e.target.value)}
-              className="bg-transparent text-white text-xs font-semibold outline-none cursor-pointer appearance-none pr-2"
+              className="bg-transparent text-white text-xs font-semibold outline-none cursor-pointer appearance-none max-w-[65px] sm:max-w-none"
             >
               {LANGUAGES.map((lang) => (
                 <option
@@ -576,7 +578,7 @@ export default function ChatPage() {
               if (window.speechSynthesis) window.speechSynthesis.cancel();
               setIsVoiceOn(!isVoiceOn);
             }}
-            className="p-2 bg-[#1a4f43] hover:bg-emerald-800 border border-emerald-700/50 rounded-full transition"
+            className="p-1.5 sm:p-2 bg-[#1a4f43] hover:bg-emerald-800 border border-emerald-700/50 rounded-full transition shrink-0"
             title={isVoiceOn ? "Mute Voice" : "Enable Voice"}
           >
             {isVoiceOn ? (
@@ -588,7 +590,7 @@ export default function ChatPage() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden bg-[#f8fafc]">
+      <div className="flex-1 flex overflow-hidden bg-[#f8fafc] min-h-0">
         <aside className="hidden md:flex w-[260px] bg-[#0f3c31] flex-col shrink-0 z-10 shadow-lg">
           <div className="p-6">
             <div className="bg-[#1a4f43] border border-emerald-700/30 rounded-2xl p-4">
@@ -656,7 +658,7 @@ export default function ChatPage() {
           </div>
         </aside>
 
-        <main className="flex-1 flex flex-col h-full bg-white relative shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.05)] z-20 rounded-tl-none md:rounded-tl-2xl overflow-hidden">
+        <main className="flex-1 flex flex-col h-full bg-white relative shadow-[-10px_0_20px_-10px_rgba(0,0,0,0.05)] z-20 rounded-tl-none md:rounded-tl-2xl overflow-hidden min-h-0 min-w-0">
           <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 scroll-smooth bg-slate-50/30">
             <AnimatePresence initial={false}>
               {messages.map((msg, idx) => (
@@ -705,13 +707,12 @@ export default function ChatPage() {
               </motion.div>
             )}
 
-            {/* FIX 2: Constrained mobile SVG container height to h-72 and flex flex-col to keep SVG bounds tight */}
             {step === 1 && !isAiThinking && !isEmergencyLocked && (
-              <div className="block lg:hidden mt-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-72 sm:h-96">
-                <h3 className="text-sm font-bold text-center mb-2 text-slate-700 shrink-0">
+              <div className="block lg:hidden mt-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[280px]">
+                <h3 className="text-[13px] font-bold text-center mb-1 text-slate-700 shrink-0">
                   {t("whereDoesItHurt")}
                 </h3>
-                <div className="flex-1 overflow-hidden relative flex items-center justify-center">
+                <div className="flex-1 overflow-hidden relative flex items-center justify-center [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:w-auto [&_svg]:h-auto [&_svg]:object-contain">
                   <BodyMapSelector onSelect={processMessage} />
                 </div>
               </div>
@@ -812,8 +813,7 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* FIX 3: Added shrink-0 and pb-4 / pb-6 to enforce flex boundaries and adapt to device bezels */}
-          <div className="shrink-0 bg-white px-4 sm:px-8 pb-4 pt-3 sm:pb-6 z-10 flex flex-col items-center border-t border-slate-100">
+          <div className="shrink-0 bg-white px-3 sm:px-8 pb-4 pt-3 sm:pb-6 z-10 flex flex-col items-center border-t border-slate-200 shadow-[0_-5px_15px_rgba(0,0,0,0.03)] relative">
             {isEmergencyLocked ? (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -838,7 +838,7 @@ export default function ChatPage() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="flex gap-2 pb-3 overflow-x-auto scrollbar-none w-full max-w-4xl"
+                        className="flex gap-2 pb-4 overflow-x-auto scrollbar-none w-full max-w-4xl"
                       >
                         {dynamicChips.map((chip, idx) => (
                           <button
