@@ -471,7 +471,8 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="h-screen w-full flex flex-col bg-white overflow-hidden font-sans">
+    // FIX 1: Changed h-screen to h-[100dvh] to adapt to mobile browser toolbars
+    <div className="h-[100dvh] w-full flex flex-col bg-white overflow-hidden font-sans">
       <AnimatePresence>
         {showEmergencyModal && !isEmergencyLocked && (
           <motion.div
@@ -704,12 +705,15 @@ export default function ChatPage() {
               </motion.div>
             )}
 
+            {/* FIX 2: Constrained mobile SVG container height to h-72 and flex flex-col to keep SVG bounds tight */}
             {step === 1 && !isAiThinking && !isEmergencyLocked && (
-              <div className="block lg:hidden mt-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                <h3 className="text-sm font-bold text-center mb-4 text-slate-700">
+              <div className="block lg:hidden mt-4 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-72 sm:h-96">
+                <h3 className="text-sm font-bold text-center mb-2 text-slate-700 shrink-0">
                   {t("whereDoesItHurt")}
                 </h3>
-                <BodyMapSelector onSelect={processMessage} />
+                <div className="flex-1 overflow-hidden relative flex items-center justify-center">
+                  <BodyMapSelector onSelect={processMessage} />
+                </div>
               </div>
             )}
 
@@ -808,7 +812,8 @@ export default function ChatPage() {
             )}
           </div>
 
-          <div className="bg-white px-4 sm:px-8 pb-6 pt-2 z-10 flex flex-col items-center border-t border-slate-100">
+          {/* FIX 3: Added shrink-0 and pb-4 / pb-6 to enforce flex boundaries and adapt to device bezels */}
+          <div className="shrink-0 bg-white px-4 sm:px-8 pb-4 pt-3 sm:pb-6 z-10 flex flex-col items-center border-t border-slate-100">
             {isEmergencyLocked ? (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -833,7 +838,7 @@ export default function ChatPage() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: "auto" }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="flex gap-2 pb-4 overflow-x-auto scrollbar-none w-full max-w-4xl"
+                        className="flex gap-2 pb-3 overflow-x-auto scrollbar-none w-full max-w-4xl"
                       >
                         {dynamicChips.map((chip, idx) => (
                           <button
