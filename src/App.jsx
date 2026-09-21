@@ -7,6 +7,24 @@ import ChatPage from "./pages/ChatPage";
 import PatientSuccessPage from "./pages/PatientSuccessPage";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import VerifyPage from "./pages/VerifyPage";
+import TriageDashboard from "./pages/TriageDashboard";
+
+// Temporary Placeholder Component for Phase 2 Roles
+const PlaceholderView = ({ title, role }) => (
+  <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white p-8 text-center space-y-4">
+    <h1 className="text-3xl font-black text-emerald-500">{title}</h1>
+    <p className="text-slate-400 max-w-md leading-relaxed">
+      You have successfully authenticated as a <strong>{role}</strong>. This
+      workspace is currently being built for Milestone 3/4.
+    </p>
+    <button
+      onClick={() => (window.location.href = "/")}
+      className="mt-6 px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-bold transition"
+    >
+      Logout / Return Home
+    </button>
+  </div>
+);
 
 function App() {
   // 1. Check if the user has successfully entered the PIN this session
@@ -36,9 +54,24 @@ function App() {
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/success" element={<PatientSuccessPage />} />
 
-          {/* Doctor & Verification Flow */}
-          <Route path="/doctor" element={<DoctorDashboard />} />
+          {/* Verification Flow */}
           <Route path="/verify" element={<VerifyPage />} />
+
+          {/* PHASE 2: Role-Based Workspaces */}
+          <Route path="/doctor" element={<DoctorDashboard />} />
+          <Route path="/triage" element={<TriageDashboard />} />
+          <Route
+            path="/dispensary"
+            element={
+              <PlaceholderView title="Pharmacy Dispensary" role="Pharmacist" />
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <PlaceholderView title="Command Center" role="Administrator" />
+            }
+          />
 
           {/* AUTOMATIC REDIRECT: Catches /home or any typo and sends them safely to the landing page */}
           <Route path="*" element={<Navigate to="/" replace />} />
