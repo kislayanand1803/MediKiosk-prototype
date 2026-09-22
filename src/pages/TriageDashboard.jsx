@@ -4,7 +4,6 @@ import { supabase } from "../services/supabaseClient";
 import {
   Activity,
   AlertTriangle,
-  Save,
   Send,
   CheckCircle2,
   HeartPulse,
@@ -14,6 +13,7 @@ import {
   Sun,
   Moon,
   LogOut,
+  RefreshCw,
 } from "lucide-react";
 
 import { useDoctorSession } from "./dashboard-hooks/useDoctorSession";
@@ -23,13 +23,6 @@ import { PATIENT_STATUS } from "./dashboard-data/patientStatus";
 
 import LoginScreen from "./dashboard-components/LoginScreen";
 
-/**
- * Nurse-specific vital ranges, used both for live input highlighting
- * and for the `isAbnormal` flag stored on each saved lab value.
- * Defined once here instead of duplicated inline (as it was before),
- * so what the nurse sees while typing can never drift from what
- * actually gets written to the chart.
- */
 const VITAL_RANGES = {
   bpSystolic: { max: 140 },
   bpDiastolic: { max: 90 },
@@ -60,7 +53,6 @@ export default function TriageDashboard() {
   );
   const queue = usePatientQueue(selectedDate, isAuthenticated, profile);
 
-  // Vitals State
   const [vitals, setVitals] = useState({
     bpSystolic: "",
     bpDiastolic: "",
@@ -71,7 +63,6 @@ export default function TriageDashboard() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
-  // Handle selecting a patient from the nurse queue
   const handleSelectPatient = (patient) => {
     queue.handleSelectPatient(patient);
     setSaveMessage("");
@@ -82,21 +73,20 @@ export default function TriageDashboard() {
       temperature: "",
       spo2: "",
     });
-    // Log audit view
     if (patient?.id) {
       supabase
         .rpc("log_patient_view", { p_patient_id: patient.id })
-        .catch(() => {});
+        .then(({ error }) => {
+          if (error) console.error("Audit log error:", error);
+        });
     }
   };
 
-  // Builds the lab_values entries from the current form state and
-  // writes them to the patient's chart. Returns the merged array (or
-  // null on failure) — shared by both "Save Vitals" and "Complete
-  // Triage" below, neither of which touches `isSaving`/`saveMessage`
-  // itself, so callers control the loading/message UI without a
-  // double-toggle between two nested handlers.
-  const saveVitalsToChart = async () => {
+  const handleCompleteTriage = async () => {
+    if (!queue.selectedPatient?.id) return;
+    setIsSaving(true);
+    setSaveMessage("");
+
     const newLabValues = [];
     if (vitals.bpSystolic && vitals.bpDiastolic) {
       newLabValues.push({
@@ -129,70 +119,51 @@ export default function TriageDashboard() {
       });
     }
 
-    // Merge with any existing lab values (e.g., from AI OCR)
     const existingLabs = queue.selectedPatient.lab_values || [];
     const mergedLabs = [...existingLabs, ...newLabValues];
+    const triagedAt = new Date().toISOString();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("patients")
-      .update({ lab_values: mergedLabs })
-      .eq("id", queue.selectedPatient.id);
+      .update({
+        lab_values: mergedLabs,
+        triaged_at: triagedAt,
+      })
+      .eq("id", queue.selectedPatient.id)
+      .select(); // STRICT FIX: Force return of updated row to catch RLS blocks
 
-    if (error) return null;
-    queue.setSelectedPatient((prev) => ({ ...prev, lab_values: mergedLabs }));
-    return mergedLabs;
-  };
-
-  const handleSaveVitals = async () => {
-    if (!queue.selectedPatient?.id) return;
-    setIsSaving(true);
-    setSaveMessage("");
-
-    const result = await saveVitalsToChart();
-
-    setIsSaving(false);
-    if (result) {
-      setSaveMessage("Vitals saved successfully.");
-      setTimeout(() => setSaveMessage(""), 3000);
-    } else {
-      setSaveMessage("Error saving vitals.");
-    }
-  };
-
-  // Saves whatever vitals are filled in, then marks triage as complete
-  // so the patient is ready to hand off to a physician's queue.
-
-  const handleCompleteTriage = async () => {
-    if (!queue.selectedPatient?.id) return;
-    setIsSaving(true);
-    setSaveMessage("");
-
-    const vitalsResult = await saveVitalsToChart();
-    if (!vitalsResult) {
+    if (error) {
+      console.error("Supabase Error:", error);
+      alert(`Failed to save: ${error.message}`);
       setIsSaving(false);
-      setSaveMessage("Error saving vitals — triage not completed.");
       return;
     }
 
-    const triagedAt = new Date().toISOString();
-    const { error } = await supabase
-      .from("patients")
-      .update({ triaged_at: triagedAt })
-      .eq("id", queue.selectedPatient.id);
-
-    setIsSaving(false);
-    if (!error) {
-      setSaveMessage("Triage complete — sent to physician queue.");
-      setTimeout(() => {
-        queue.setSelectedPatient(null); // Clears the screen after success
-        setSaveMessage("");
-      }, 1500);
-    } else {
-      setSaveMessage("Error completing triage.");
+    if (!data || data.length === 0) {
+      alert(
+        "Database security policy (RLS) blocked the update. Please check your Supabase 'Nurses can update patient vitals' policy.",
+      );
+      setIsSaving(false);
+      return;
     }
+
+    queue.setPatients((prev) =>
+      prev.map((p) =>
+        p.id === queue.selectedPatient.id
+          ? { ...p, lab_values: mergedLabs, triaged_at: triagedAt }
+          : p,
+      ),
+    );
+
+    setSaveMessage("Triage complete — sent to physician queue.");
+
+    setTimeout(() => {
+      queue.setSelectedPatient(null);
+      setSaveMessage("");
+      setIsSaving(false);
+    }, 1500);
   };
 
-  // Escalate to Urgent/Red Flag
   const handleEscalate = async () => {
     if (!queue.selectedPatient?.id) return;
     if (
@@ -202,18 +173,28 @@ export default function TriageDashboard() {
     )
       return;
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("patients")
       .update({ is_red_flag: true, urgency_level: "Urgent" })
-      .eq("id", queue.selectedPatient.id);
+      .eq("id", queue.selectedPatient.id)
+      .select();
 
-    if (!error) {
+    if (!error && data?.length > 0) {
+      queue.setPatients((prev) =>
+        prev.map((p) =>
+          p.id === queue.selectedPatient.id
+            ? { ...p, is_red_flag: true, urgency_level: "Urgent" }
+            : p,
+        ),
+      );
       queue.setSelectedPatient((prev) => ({
         ...prev,
         is_red_flag: true,
         urgency_level: "Urgent",
       }));
       setSaveMessage("Patient escalated to URGENT.");
+    } else if (!data || data.length === 0) {
+      alert("Update blocked by database security policy.");
     }
   };
 
@@ -229,17 +210,10 @@ export default function TriageDashboard() {
     return <LoginScreen onBackHome={() => navigate("/")} />;
   }
 
-  // Computed once and reused for the count badge, the empty-state
-  // check, and the list itself — previously this same filter was
-  // written out three separate times, which is exactly how the count
-  // and the list can quietly drift apart (see the note about "0
-  // Pending" vs. an already-open patient — check what queue.patients
-  // actually contains for that record).
   const waitingPatients = queue.patients.filter(
     (p) => p.status === PATIENT_STATUS.WAITING && !p.triaged_at,
   );
 
-  // Ensure the auto-selected patient is actually in the waiting room
   const isSelectedPatientWaiting =
     queue.selectedPatient &&
     waitingPatients.some((p) => p.id === queue.selectedPatient.id);
@@ -247,17 +221,6 @@ export default function TriageDashboard() {
   return (
     <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-slate-950 p-3 sm:p-4 md:p-6 transition-colors duration-200 flex flex-col">
       <div className="mx-auto w-full flex-1 flex flex-col space-y-4 overflow-hidden">
-        {/*
-          Nurse-specific header, kept independent from the physician
-          dashboard's <DashboardHeader />. That component hardcodes
-          "MediKiosk Physician Portal" plus the doctor's Queue/Analytics
-          tabs — reusing it here (as the previous version did, with
-          onChangeTab as a no-op) is what caused the wrong title and a
-          dead "Ayush Ministry Analytics" tab to show up in your
-          screenshot. Per your Phase 2 permission matrix, analytics is
-          Admin/CMO-only anyway, so nurses shouldn't see that tab at all
-          — not even a disabled one.
-        */}
         <header className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
@@ -278,6 +241,14 @@ export default function TriageDashboard() {
               className="text-blue-600 dark:text-blue-400 text-xs hover:underline font-bold bg-blue-50 dark:bg-blue-900/30 px-3 py-2 rounded-lg"
             >
               Home
+            </button>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              title="Force Sync Real-time Data"
+              className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 rounded-lg transition"
+            >
+              <RefreshCw size={16} aria-hidden="true" />
             </button>
             <button
               type="button"
@@ -305,7 +276,6 @@ export default function TriageDashboard() {
         </header>
 
         <div className="flex-1 flex flex-col lg:flex-row gap-4 overflow-hidden">
-          {/* LEFT: Waiting Queue */}
           <div className="w-full lg:w-1/3 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 flex flex-col overflow-hidden">
             <div className="p-4 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
               <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -355,21 +325,15 @@ export default function TriageDashboard() {
             </div>
           </div>
 
-          {/* RIGHT: Vitals Capture Panel */}
           <div className="w-full lg:w-2/3 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 flex flex-col overflow-hidden">
             {isSelectedPatientWaiting ? (
               <div className="flex flex-col h-full">
-                {/* Patient Header */}
                 <div className="p-6 border-b border-gray-200 dark:border-slate-800 flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-xl font-black text-gray-900 dark:text-white">
                         {queue.selectedPatient.name}
                       </h2>
-                      {/* Was missing entirely from this detail view — the
-                          list on the left shows it, but once a nurse is
-                          heads-down recording vitals, they've scrolled
-                          past that list and lose the token reference. */}
                       <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
                         {queue.selectedPatient.token_number || "TKN-PENDING"}
                       </span>
@@ -409,7 +373,6 @@ export default function TriageDashboard() {
                   </h3>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Blood Pressure */}
                     <div
                       className={`p-4 border rounded-xl bg-white dark:bg-slate-800 transition-colors ${
                         isVitalAbnormal("bpSystolic", vitals.bpSystolic) ||
@@ -458,7 +421,6 @@ export default function TriageDashboard() {
                       </div>
                     </div>
 
-                    {/* Heart Rate */}
                     <div
                       className={`p-4 border rounded-xl bg-white dark:bg-slate-800 transition-colors ${
                         isVitalAbnormal("heartRate", vitals.heartRate)
@@ -487,7 +449,6 @@ export default function TriageDashboard() {
                       />
                     </div>
 
-                    {/* Temperature */}
                     <div
                       className={`p-4 border rounded-xl bg-white dark:bg-slate-800 transition-colors ${
                         isVitalAbnormal("temperature", vitals.temperature)
@@ -517,7 +478,6 @@ export default function TriageDashboard() {
                       />
                     </div>
 
-                    {/* SpO2 */}
                     <div
                       className={`p-4 border rounded-xl bg-white dark:bg-slate-800 transition-colors ${
                         isVitalAbnormal("spo2", vitals.spo2)
@@ -547,10 +507,6 @@ export default function TriageDashboard() {
                     </div>
                   </div>
 
-                  {/* Nudge toward escalation — deliberately a suggestion,
-                      not an automatic action. The nurse still decides;
-                      this just makes sure an abnormal reading can't slip
-                      by unnoticed once it's typed in. */}
                   {!queue.selectedPatient.is_red_flag &&
                     Object.keys(vitals).some((key) =>
                       isVitalAbnormal(key, vitals[key]),
@@ -568,19 +524,6 @@ export default function TriageDashboard() {
                     )}
                 </div>
 
-                {/*
-                  Footer Action Bar
-                  Previously only had "Save Vitals to Chart", which
-                  updates lab_values but never changes anything that
-                  moves the patient forward — they'd stay in this same
-                  Waiting Room list indefinitely with no way to hand off
-                  to a physician. "Complete Triage" is the new action
-                  that actually closes that gap (see handleCompleteTriage
-                  above, and the triaged_at migration note there). Kept
-                  "Save Vitals" as a separate, lighter action too, for
-                  saving partial vitals without ending triage yet — e.g.
-                  a nurse capturing readings between two other tasks.
-                */}
                 <div className="p-4 border-t border-gray-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 flex flex-col sm:flex-row items-center justify-between gap-3">
                   <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 order-2 sm:order-1">
                     {saveMessage && (
@@ -589,38 +532,22 @@ export default function TriageDashboard() {
                       </>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 order-1 sm:order-2 w-full sm:w-auto">
-                    <button
-                      onClick={handleSaveVitals}
-                      disabled={
-                        isSaving ||
-                        (!vitals.bpSystolic &&
-                          !vitals.heartRate &&
-                          !vitals.temperature &&
-                          !vitals.spo2)
-                      }
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-700 disabled:opacity-50 text-gray-700 dark:text-slate-200 rounded-xl text-sm font-bold transition"
-                    >
-                      <Save size={16} />
-                      {isSaving ? "Saving..." : "Save Vitals"}
-                    </button>
-                    <button
-                      onClick={handleCompleteTriage}
-                      disabled={
-                        isSaving ||
-                        (!vitals.bpSystolic &&
-                          !vitals.heartRate &&
-                          !vitals.temperature &&
-                          !vitals.spo2)
-                      }
-                      className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-md transition"
-                    >
-                      <Send size={16} />
-                      {isSaving
-                        ? "Saving..."
-                        : "Complete Triage & Send to Physician"}
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleCompleteTriage}
+                    disabled={
+                      isSaving ||
+                      (!vitals.bpSystolic &&
+                        !vitals.heartRate &&
+                        !vitals.temperature &&
+                        !vitals.spo2)
+                    }
+                    className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-sm font-bold shadow-md transition flex items-center justify-center gap-2 order-1 sm:order-2"
+                  >
+                    <Send size={18} />
+                    {isSaving
+                      ? "Saving..."
+                      : "Complete Triage & Send to Physician"}
+                  </button>
                 </div>
               </div>
             ) : (

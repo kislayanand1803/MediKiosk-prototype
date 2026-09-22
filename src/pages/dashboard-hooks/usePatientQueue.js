@@ -2,19 +2,12 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { PATIENT_STATUS } from "../dashboard-data/patientStatus";
 
-// Added 'department' to the column selection so the UI knows where the patient belongs
 const PATIENT_LIST_COLUMNS =
-  "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, urgency_level, primary_complaint, possible_diagnosis, agni_status, koshtha_status, ahara_vihara, dosha_data, department";
+  "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, urgency_level, primary_complaint, possible_diagnosis, agni_status, koshtha_status, ahara_vihara, dosha_data, department, triaged_at";
 
 const PATIENT_DETAIL_COLUMNS =
-  "subjective_history, extracted_doc_notes, medications, lab_values, timeline, document_images";
+  "subjective_history, extracted_doc_notes, medications, lab_values, timeline, document_images, triaged_at";
 
-/**
- * ============================================================================
- * PATIENT QUEUE HOOK (Phase 2 Smart Routing)
- * ============================================================================
- */
-// IMPORTANT: We now pass the staff 'profile' down into the hook
 export function usePatientQueue(selectedDate, isAuthenticated, profile) {
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -35,8 +28,6 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
       .gte("created_at", startDate.toISOString())
       .lte("created_at", endDate.toISOString());
 
-    // PHASE 2 ROUTING LOGIC
-    // If the doctor has a specific department and it's NOT 'General', filter the queue.
     if (profile?.department && profile.department !== "General") {
       query = query.eq("department", profile.department);
     }
@@ -85,10 +76,9 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
   };
 
   const handleCallNextPatient = async () => {
+    // STRICT FIX: Only call patients who are waiting AND have passed triage
     const nextPatient = patients.find(
-      (p) =>
-        p.status !== PATIENT_STATUS.APPROVED &&
-        p.status !== PATIENT_STATUS.IN_CONSULTATION,
+      (p) => p.status === PATIENT_STATUS.WAITING && p.triaged_at,
     );
     if (!nextPatient) return { calledPatient: null };
 
@@ -158,7 +148,6 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
   };
 
   useEffect(() => {
-    // We added profile?.department to the dependency array so it refetches correctly if the role loads late
     if (isAuthenticated) fetchPatients();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, selectedDate, profile?.department]);
@@ -166,7 +155,6 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
   useEffect(() => {
     if (!isAuthenticated) return undefined;
 
-    // We update the real-time subscription to specifically listen for patients matching this department
     let channelFilter = `status=neq.${PATIENT_STATUS.APPROVED}`;
     if (profile?.department && profile.department !== "General") {
       channelFilter = `department=eq.${profile.department}`;
@@ -192,6 +180,7 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
 
   return {
     patients,
+    setPatients, // STRICT FIX: Exposed to allow instantaneous local UI updates
     selectedPatient,
     isEditing,
     caseNotes,
