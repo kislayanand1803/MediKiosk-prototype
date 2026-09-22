@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Clock,
   DownloadCloud,
+  Loader2,
 } from "lucide-react";
 import {
   BarChart,
@@ -36,15 +37,10 @@ const COMPLAINT_COLORS = [
   "#64748b",
 ];
 
-/**
- * ============================================================================
- * AYUSH MINISTRY ANALYTICS PANEL
- * ============================================================================
- * Complete command center displaying global historical data across all patients.
- * Includes Command Header (CSV Export), Core KPIs, Feature Highlights,
- * 3-Column Analytics Grid, Operational Throughput Heatmap, and Ayush Compliance.
- */
 export default function AnalyticsPanel({
+  analyticsMonth,
+  onChangeMonth,
+  isLoading,
   totalFootfall = 0,
   approvedCount = 0,
   redFlagCount = 0,
@@ -70,15 +66,25 @@ export default function AnalyticsPanel({
   };
 
   return (
-    <div className="space-y-6 h-full overflow-y-auto pb-8 pr-2">
+    <div className="space-y-6 h-full overflow-y-auto pb-8 pr-2 relative">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="absolute inset-0 z-50 bg-white/50 dark:bg-slate-950/50 backdrop-blur-sm flex items-center justify-center rounded-xl">
+          <div className="flex items-center gap-3 bg-white dark:bg-slate-800 px-6 py-3 rounded-2xl shadow-xl border border-gray-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-500 font-bold">
+            <Loader2 className="animate-spin" size={20} />
+            Fetching Period Data...
+          </div>
+        </div>
+      )}
+
       {/* COMMAND CENTER HEADER & CSV EXPORT */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
         <div>
           <h2 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
             <BarChart3
               className="text-emerald-600 dark:text-emerald-500"
               aria-hidden="true"
-            />{" "}
+            />
             Ayush Ministry Command Center
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -86,13 +92,23 @@ export default function AnalyticsPanel({
             throughput.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onExportCSV}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-md transition-all active:scale-95 hover:shadow-emerald-600/30"
-        >
-          <DownloadCloud size={16} aria-hidden="true" /> Export CSV Report
-        </button>
+
+        {/* Month Selector & Action Button */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          <input
+            type="month"
+            value={analyticsMonth}
+            onChange={(e) => onChangeMonth(e.target.value)}
+            className="w-full sm:w-auto bg-slate-50 dark:bg-slate-950 border border-gray-200 dark:border-slate-700 text-gray-800 dark:text-white text-xs font-bold rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all cursor-pointer dark:[color-scheme:dark]"
+          />
+          <button
+            type="button"
+            onClick={onExportCSV}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-md transition-all active:scale-95 hover:shadow-emerald-600/30"
+          >
+            <DownloadCloud size={16} aria-hidden="true" /> Export CSV Report
+          </button>
+        </div>
       </div>
 
       {/* ROW 1: CORE KPIs */}
@@ -110,8 +126,7 @@ export default function AnalyticsPanel({
             {totalFootfall}
           </p>
           <p className="text-[10px] text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
-            <TrendingUp size={11} aria-hidden="true" /> Active kiosk sessions
-            recorded
+            <TrendingUp size={11} aria-hidden="true" /> Period kiosk sessions
           </p>
         </div>
 
@@ -169,7 +184,7 @@ export default function AnalyticsPanel({
         </div>
       </div>
 
-      {/* ROW 2: FEATURE HIGHLIGHTS (RESTORED) */}
+      {/* ROW 2: FEATURE HIGHLIGHTS */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-3 transition-colors duration-200">
           <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg">
@@ -225,7 +240,6 @@ export default function AnalyticsPanel({
 
       {/* ROW 3: THREE-COLUMN DATA GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Col 1: Dosha Trends */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col transition-colors duration-200">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
@@ -233,7 +247,7 @@ export default function AnalyticsPanel({
                 size={16}
                 className="text-blue-600 dark:text-blue-500"
                 aria-hidden="true"
-              />
+              />{" "}
               Dosha Trends (Vikriti)
             </h3>
           </div>
@@ -272,7 +286,6 @@ export default function AnalyticsPanel({
           </div>
         </div>
 
-        {/* Col 2: Syndromic Surveillance (Top 5 Complaints) */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col transition-colors duration-200">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
@@ -280,7 +293,7 @@ export default function AnalyticsPanel({
                 size={16}
                 className="text-orange-500"
                 aria-hidden="true"
-              />
+              />{" "}
               Top Chief Complaints
             </h3>
             <span className="text-[9px] bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase">
@@ -324,15 +337,13 @@ export default function AnalyticsPanel({
           </div>
         </div>
 
-        {/* Col 3: Demographics Split */}
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex flex-col transition-colors duration-200">
           <div className="flex justify-between items-center mb-2">
             <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
-              <Users size={16} className="text-pink-500" aria-hidden="true" />
+              <Users size={16} className="text-pink-500" aria-hidden="true" />{" "}
               Patient Demographics
             </h3>
           </div>
-
           <div className="flex-1 flex flex-col">
             <div className="h-28 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
@@ -358,7 +369,6 @@ export default function AnalyticsPanel({
                 Gender
               </div>
             </div>
-
             <div className="h-28 w-full mt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -399,20 +409,20 @@ export default function AnalyticsPanel({
         </div>
       </div>
 
-      {/* ROW 4: PEAK HOURS HEATMAP (FULL WIDTH) */}
+      {/* ROW 4: PEAK HOURS HEATMAP */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-4 transition-colors duration-200">
         <div className="flex justify-between items-center">
           <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
-            <Clock size={18} className="text-emerald-500" aria-hidden="true" />
+            <Clock size={18} className="text-emerald-500" aria-hidden="true" />{" "}
             Operational Throughput (24-Hour Peak OPD Heatmap)
           </h3>
           <span className="text-[10px] bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-widest">
-            Facility Congestion Telemetry
+            Facility Congestion
           </span>
         </div>
         <p className="text-xs text-gray-500 dark:text-slate-400">
           Aggregated case volume mapped across a 24-hour cycle. Warmer colors
-          indicate severe counter bottlenecks requiring additional triage staff.
+          indicate severe counter bottlenecks.
         </p>
         <div className="h-48 w-full mt-4">
           <ResponsiveContainer width="100%" height="100%">
@@ -465,7 +475,7 @@ export default function AnalyticsPanel({
         </div>
       </div>
 
-      {/* ROW 5: COMPLIANCE FOOTER (RESTORED) */}
+      {/* ROW 5: COMPLIANCE FOOTER */}
       <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-4 flex flex-col justify-between transition-colors duration-200">
         <div className="space-y-3">
           <h3 className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">

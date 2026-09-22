@@ -236,7 +236,7 @@ export default function TriageDashboard() {
   // Pending" vs. an already-open patient — check what queue.patients
   // actually contains for that record).
   const waitingPatients = queue.patients.filter(
-    (p) => p.status === PATIENT_STATUS.WAITING,
+    (p) => p.status === PATIENT_STATUS.WAITING && !p.triaged_at,
   );
 
   // Ensure the auto-selected patient is actually in the waiting room

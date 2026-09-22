@@ -22,14 +22,8 @@ import AnalyticsPanel from "./dashboard-components/AnalyticsPanel";
 import FhirExportModal from "./dashboard-components/FhirExportModal";
 import DocumentViewerModal from "./dashboard-components/DocumentViewerModal";
 
-/**
- * ============================================================================
- * DOCTOR DASHBOARD (PHYSICIAN PORTAL)
- * ============================================================================
- */
 export default function DoctorDashboard() {
   const navigate = useNavigate();
-  // PHASE 2: Destructuring 'profile' from our upgraded session hook
   const { isAuthenticated, isLoadingSession, logout, profile } =
     useDoctorSession();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
@@ -42,17 +36,23 @@ export default function DoctorDashboard() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
   );
+
+  // NEW: State for Monthly Analytics Filter
+  const [analyticsMonth, setAnalyticsMonth] = useState(
+    new Date().toISOString().substring(0, 7),
+  );
+
   const [showFhirModal, setShowFhirModal] = useState(false);
   const [showDocViewer, setShowDocViewer] = useState(false);
   const [copiedFhir, setCopiedFhir] = useState(false);
 
-  // Daily Queue Fetch (Now department-aware based on the doctor's profile)
   const queue = usePatientQueue(selectedDate, isAuthenticated, profile);
 
   // ========================================================================
-  // GLOBAL HISTORICAL FETCH FOR ANALYTICS
+  // GLOBAL HISTORICAL FETCH FOR ANALYTICS (NOW MONTH-BOUNDED)
   // ========================================================================
   const [allPatients, setAllPatients] = useState([]);
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || activeTab !== "analytics") return;
@@ -60,14 +60,23 @@ export default function DoctorDashboard() {
     let isMounted = true;
 
     async function loadAnalytics() {
+      setIsAnalyticsLoading(true);
       try {
+        // Calculate start and end of the selected month
+        const year = parseInt(analyticsMonth.split("-")[0], 10);
+        const month = parseInt(analyticsMonth.split("-")[1], 10) - 1; // JS months are 0-indexed
+
+        const startDate = new Date(year, month, 1);
+        const endDate = new Date(year, month + 1, 0, 23, 59, 59, 999);
+
         let query = supabase
           .from("patients")
           .select(
             "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, primary_complaint, dosha_data, department",
-          );
+          )
+          .gte("created_at", startDate.toISOString())
+          .lte("created_at", endDate.toISOString());
 
-        // PHASE 2 ROUTING: Analytics reflect the doctor's specific department
         if (profile?.department && profile.department !== "General") {
           query = query.eq("department", profile.department);
         }
@@ -76,14 +85,17 @@ export default function DoctorDashboard() {
 
         if (error) {
           console.error("Supabase Analytics Fetch Error:", error);
+          setIsAnalyticsLoading(false);
           return;
         }
 
-        if (data && isMounted) {
-          setAllPatients(data);
+        if (isMounted) {
+          setAllPatients(data || []);
+          setIsAnalyticsLoading(false);
         }
       } catch (err) {
         console.error("Analytics network error:", err);
+        if (isMounted) setIsAnalyticsLoading(false);
       }
     }
 
@@ -92,10 +104,16 @@ export default function DoctorDashboard() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, activeTab, queue.patients.length, profile?.department]);
+  }, [
+    isAuthenticated,
+    activeTab,
+    analyticsMonth,
+    queue.patients.length,
+    profile?.department,
+  ]);
 
-  // If allPatients hasn't finished loading yet, fallback to queue.patients so the UI never displays 0
-  const activeDataset = allPatients.length > 0 ? allPatients : queue.patients;
+  // Use allPatients directly. If it's an empty month, we want it to show 0, not fallback to today's queue.
+  const activeDataset = allPatients;
 
   const analyticsFootfall = activeDataset.length;
   const analyticsApproved = activeDataset.filter(
@@ -106,7 +124,6 @@ export default function DoctorDashboard() {
     (p) => p.abha_id && p.abha_id !== "Not Linked",
   ).length;
 
-  // 1. National Dosha Trends
   const averageDosha = (index, fallback) =>
     analyticsFootfall
       ? Math.round(
@@ -123,7 +140,6 @@ export default function DoctorDashboard() {
     { name: "Kapha (Earth)", value: averageDosha(2, 40) },
   ];
 
-  // 2. Syndromic Surveillance NLP Parser
   const getTopComplaints = () => {
     const cats = {
       Fever: 0,
@@ -184,7 +200,6 @@ export default function DoctorDashboard() {
       .slice(0, 5);
   };
 
-  // 3. Patient Demographics Split
   const getDemographics = () => {
     const ages = { "0-18": 0, "19-35": 0, "36-50": 0, "51+": 0 };
     const genders = { Male: 0, Female: 0, Other: 0 };
@@ -196,9 +211,7 @@ export default function DoctorDashboard() {
         else if (age <= 35) ages["19-35"]++;
         else if (age <= 50) ages["36-50"]++;
         else ages["51+"]++;
-      } else {
-        ages["19-35"]++;
-      }
+      } else ages["19-35"]++;
 
       if (p.gender === "Male") genders.Male++;
       else if (p.gender === "Female") genders.Female++;
@@ -214,19 +227,14 @@ export default function DoctorDashboard() {
     };
   };
 
-  // 4. 24-Hour Peak OPD Heatmap
   const getPeakHours = () => {
     const hours = Array(24).fill(0);
     activeDataset.forEach((p) => {
       if (p.created_at) {
         try {
           const hour = new Date(p.created_at).getHours();
-          if (!isNaN(hour)) {
-            hours[hour]++;
-          }
-        } catch (e) {
-          // Ignore invalid timestamp
-        }
+          if (!isNaN(hour)) hours[hour]++;
+        } catch (e) {}
       }
     });
     return hours.map((count, hour) => ({
@@ -235,12 +243,9 @@ export default function DoctorDashboard() {
     }));
   };
 
-  // ========================================================================
-  // CSV EXPORT UTILITY
-  // ========================================================================
   const exportMinistryReport = () => {
     if (!activeDataset || activeDataset.length === 0) {
-      alert("No patient data available to export.");
+      alert(`No patient data available to export for ${analyticsMonth}.`);
       return;
     }
 
@@ -289,36 +294,27 @@ export default function DoctorDashboard() {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `Ayush_Ministry_Report_${new Date().toISOString().split("T")[0]}.csv`,
+      `Ayush_Ministry_Report_${analyticsMonth}.csv`,
     );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // ========================================================================
-  // APPROVE + E-PRESCRIPTION TRIGGER
-  // ========================================================================
   const handleApproveAndGenerateRx = async () => {
     const success = await queue.handleApprove();
     if (success) {
-      // Pass 'profile' so the prescription prints the correct Doctor Name and Department
       generateEPrescription(queue.selectedPatient, queue.prescription, profile);
     }
   };
 
-  // ========================================================================
-
   const handleSelectPatientWithTimer = (patient) => {
     queue.handleSelectPatient(patient);
-
-    // PHASE 2 AUDIT LOGGING: Record the action of viewing a patient's file
     if (patient?.id) {
       supabase
         .rpc("log_patient_view", { p_patient_id: patient.id })
         .catch(() => {});
     }
-
     if (
       patient.status === PATIENT_STATUS.IN_CONSULTATION &&
       !queue.consultationStartTime
@@ -331,7 +327,6 @@ export default function DoctorDashboard() {
     const result = await queue.handleCallNextPatient();
     if (result.calledPatient) {
       setQueueFilter(PATIENT_STATUS.IN_CONSULTATION);
-      // Log viewing the patient called next
       supabase
         .rpc("log_patient_view", { p_patient_id: result.calledPatient.id })
         .catch(() => {});
@@ -397,7 +392,10 @@ export default function DoctorDashboard() {
 
         {activeTab === "queue" && (
           <QueueTab
-            patients={queue.patients}
+            // Filter: Allow all non-waiting statuses, but for 'Waiting', require triaged_at
+            patients={queue.patients.filter(
+              (p) => p.status !== PATIENT_STATUS.WAITING || p.triaged_at,
+            )}
             selectedPatient={queue.selectedPatient}
             isEditing={queue.isEditing}
             caseNotes={queue.caseNotes}
@@ -432,6 +430,9 @@ export default function DoctorDashboard() {
 
         {activeTab === "analytics" && (
           <AnalyticsPanel
+            analyticsMonth={analyticsMonth}
+            onChangeMonth={setAnalyticsMonth}
+            isLoading={isAnalyticsLoading}
             totalFootfall={analyticsFootfall}
             approvedCount={analyticsApproved}
             redFlagCount={analyticsRedFlag}
