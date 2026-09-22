@@ -114,6 +114,16 @@ export default function DoctorDashboard() {
 
   // Use allPatients directly. If it's an empty month, we want it to show 0, not fallback to today's queue.
   const activeDataset = allPatients;
+  // Create a strict list of valid patients for the physician queue
+  const validQueuePatients = queue.patients.filter(
+    (p) => p.status !== PATIENT_STATUS.WAITING || p.triaged_at,
+  );
+  // Ensure the auto-selected patient is actually in this valid list
+  const validSelectedPatient =
+    queue.selectedPatient &&
+    validQueuePatients.some((p) => p.id === queue.selectedPatient.id)
+      ? queue.selectedPatient
+      : null;
 
   const analyticsFootfall = activeDataset.length;
   const analyticsApproved = activeDataset.filter(
@@ -393,10 +403,8 @@ export default function DoctorDashboard() {
         {activeTab === "queue" && (
           <QueueTab
             // Filter: Allow all non-waiting statuses, but for 'Waiting', require triaged_at
-            patients={queue.patients.filter(
-              (p) => p.status !== PATIENT_STATUS.WAITING || p.triaged_at,
-            )}
-            selectedPatient={queue.selectedPatient}
+            patients={validQueuePatients}
+            selectedPatient={validSelectedPatient}
             isEditing={queue.isEditing}
             caseNotes={queue.caseNotes}
             prescription={queue.prescription}
