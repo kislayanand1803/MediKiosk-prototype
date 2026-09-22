@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { supabase } from "./supabaseClient";
 import { generateFHIRBundle } from "../utils/fhirMapper";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 // =========================================================
 // 1. GLOBAL MEMORY OPTIMIZATION
