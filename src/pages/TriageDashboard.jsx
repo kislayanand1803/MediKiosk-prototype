@@ -77,7 +77,10 @@ export default function TriageDashboard() {
       supabase
         .rpc("log_patient_view", { p_patient_id: patient.id })
         .then(({ error }) => {
-          if (error) console.error("Audit log error:", error);
+          if (error) console.error("DPDP Audit block:", error.message);
+        })
+        .catch((networkErr) => {
+          console.error("Network failed before audit could log:", networkErr);
         });
     }
   };

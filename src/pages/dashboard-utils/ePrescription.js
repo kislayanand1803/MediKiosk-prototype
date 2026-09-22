@@ -12,11 +12,7 @@ function cleanClinicalText(text) {
   return text.replace(/^[🗣️📄🤖\s]+/, "").trim();
 }
 
-export function generateEPrescription(
-  patient,
-  prescriptionText,
-  doctorMeta = {},
-) {
+export function generateEPrescription(patient, prescriptionText, doctorMeta) {
   if (!patient) return;
 
   const reportDate = new Date().toLocaleDateString("en-IN", {
@@ -31,17 +27,35 @@ export function generateEPrescription(
     hour12: true,
   });
 
-  // PHASE 2 FIX: Dynamically pull the logged-in doctor's complete profile
+  // Safely handle if the dashboard explicitly passes 'null'
+  const safeDoctorMeta = doctorMeta || {};
+
+  // Robust name resolution
+  let resolvedName =
+    safeDoctorMeta.full_name || safeDoctorMeta.name || "Dr. Rajeshwar Sharma";
+
+  if (
+    resolvedName.toLowerCase() === "nurse" ||
+    resolvedName.toLowerCase() === "doctor"
+  ) {
+    resolvedName = "Dr. Rajeshwar Sharma (Demo)";
+  }
+  if (!resolvedName.toLowerCase().startsWith("dr")) {
+    resolvedName = `Dr. ${resolvedName}`;
+  }
+
   const doctor = {
-    name: doctorMeta.full_name || "Dr. Rajeshwar Sharma",
-    qualification: doctorMeta.qualification || "BAMS, MD (Ayurveda)",
-    regNo: doctorMeta.reg_no || "NCISM/AYU-UP/2018/08492",
-    facility: doctorMeta.facility || "Ayush Integrated Community Health Center",
+    name: resolvedName,
+    qualification: safeDoctorMeta.qualification || "BAMS, MD (Ayurveda)",
+    regNo: safeDoctorMeta.reg_no || "NCISM/AYU-UP/2018/08492",
+    facility:
+      safeDoctorMeta.facility || "Ayush Integrated Community Health Center",
     address:
-      doctorMeta.address ||
+      safeDoctorMeta.address ||
       "Sector-12, Institutional Area, Ghaziabad, UP - 201001",
-    contact: doctorMeta.contact || "opd@ayush-kiosk.gov.in | +91 120-2984001",
-    department: doctorMeta.department || "General Medicine",
+    contact:
+      safeDoctorMeta.contact || "opd@ayush-kiosk.gov.in | +91 120-2984001",
+    department: safeDoctorMeta.department || "General Medicine",
   };
 
   const printWindow = window.open("", "_blank");
@@ -52,16 +66,28 @@ export function generateEPrescription(
     return;
   }
 
-  // Extract Vitals from lab_values if present
-  const vitals = (patient.lab_values || []).filter((v) =>
+  // PHASE 2 FIX: Extract and strictly DEDUPLICATE Vitals
+  // (Prevents overlapping grids if multiple readings were saved to the array)
+  const rawVitals = (patient.lab_values || []).filter((v) =>
     [
       "temperature",
+      "heart rate", // Matches what TriageDashboard actually saves
       "pulse rate",
       "blood pressure",
       "spo2",
       "respiratory rate",
     ].some((key) => v.testName?.toLowerCase().includes(key)),
   );
+
+  const uniqueVitalsMap = new Map();
+  rawVitals.forEach((v) => {
+    if (v.testName) {
+      // By using the test name as the key, later duplicates overwrite earlier ones,
+      // ensuring the prescription only prints the most recent reading.
+      uniqueVitalsMap.set(v.testName.toLowerCase(), v);
+    }
+  });
+  const vitals = Array.from(uniqueVitalsMap.values());
 
   const htmlContent = `
     <!DOCTYPE html>

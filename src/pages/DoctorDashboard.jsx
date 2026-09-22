@@ -314,7 +314,12 @@ export default function DoctorDashboard() {
   const handleApproveAndGenerateRx = async () => {
     const success = await queue.handleApprove();
     if (success) {
-      generateEPrescription(queue.selectedPatient, queue.prescription, profile);
+      // STRICT FIX: Pass empty object if profile is null to prevent PDF crash
+      generateEPrescription(
+        queue.selectedPatient,
+        queue.prescription,
+        profile || {},
+      );
     }
   };
 
@@ -323,7 +328,12 @@ export default function DoctorDashboard() {
     if (patient?.id) {
       supabase
         .rpc("log_patient_view", { p_patient_id: patient.id })
-        .catch(() => {});
+        .then(({ error }) => {
+          if (error) console.error("DPDP Audit block:", error.message);
+        })
+        .catch((networkErr) => {
+          console.error("Network failed before audit could log:", networkErr);
+        });
     }
     if (
       patient.status === PATIENT_STATUS.IN_CONSULTATION &&
@@ -339,7 +349,12 @@ export default function DoctorDashboard() {
       setQueueFilter(PATIENT_STATUS.IN_CONSULTATION);
       supabase
         .rpc("log_patient_view", { p_patient_id: result.calledPatient.id })
-        .catch(() => {});
+        .then(({ error }) => {
+          if (error) console.error("DPDP Audit block:", error.message);
+        })
+        .catch((networkErr) => {
+          console.error("Network failed before audit could log:", networkErr);
+        });
     }
     return result;
   };
