@@ -8,6 +8,7 @@ import PatientSuccessPage from "./pages/PatientSuccessPage";
 import DoctorDashboard from "./pages/DoctorDashboard";
 import VerifyPage from "./pages/VerifyPage";
 import TriageDashboard from "./pages/TriageDashboard";
+import PharmacyDashboard from "./pages/PharmacyDashboard";
 
 // Temporary Placeholder Component for Phase 2 Roles
 const PlaceholderView = ({ title, role }) => (
@@ -60,12 +61,7 @@ function App() {
           {/* PHASE 2: Role-Based Workspaces */}
           <Route path="/doctor" element={<DoctorDashboard />} />
           <Route path="/triage" element={<TriageDashboard />} />
-          <Route
-            path="/dispensary"
-            element={
-              <PlaceholderView title="Pharmacy Dispensary" role="Pharmacist" />
-            }
-          />
+          <Route path="/dispensary" element={<PharmacyDashboard />} />
           <Route
             path="/admin"
             element={
