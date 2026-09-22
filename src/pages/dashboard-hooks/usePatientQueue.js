@@ -2,19 +2,20 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../services/supabaseClient";
 import { PATIENT_STATUS } from "../dashboard-data/patientStatus";
 
+// Added 'department' to the column selection so the UI knows where the patient belongs
 const PATIENT_LIST_COLUMNS =
-  "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, urgency_level, primary_complaint, possible_diagnosis, agni_status, koshtha_status, ahara_vihara, dosha_data";
+  "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, urgency_level, primary_complaint, possible_diagnosis, agni_status, koshtha_status, ahara_vihara, dosha_data, department";
 
-// FIXED: Removed the non-existent 'prescription' column to prevent the Supabase 500 error
 const PATIENT_DETAIL_COLUMNS =
   "subjective_history, extracted_doc_notes, medications, lab_values, timeline, document_images";
 
 /**
  * ============================================================================
- * PATIENT QUEUE HOOK
+ * PATIENT QUEUE HOOK (Phase 2 Smart Routing)
  * ============================================================================
  */
-export function usePatientQueue(selectedDate, isAuthenticated) {
+// IMPORTANT: We now pass the staff 'profile' down into the hook
+export function usePatientQueue(selectedDate, isAuthenticated, profile) {
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -28,13 +29,23 @@ export function usePatientQueue(selectedDate, isAuthenticated) {
     const endDate = new Date(selectedDate);
     endDate.setHours(23, 59, 59, 999);
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("patients")
       .select(PATIENT_LIST_COLUMNS)
       .gte("created_at", startDate.toISOString())
-      .lte("created_at", endDate.toISOString())
+      .lte("created_at", endDate.toISOString());
+
+    // PHASE 2 ROUTING LOGIC
+    // If the doctor has a specific department and it's NOT 'General', filter the queue.
+    if (profile?.department && profile.department !== "General") {
+      query = query.eq("department", profile.department);
+    }
+
+    query = query
       .order("is_red_flag", { ascending: false })
       .order("created_at", { ascending: true });
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Supabase fetch error:", error.message);
@@ -57,7 +68,7 @@ export function usePatientQueue(selectedDate, isAuthenticated) {
     setSelectedPatient(patient);
     setIsEditing(false);
     setCaseNotes("Loading clinical notes...");
-    setPrescription(""); // Resets the PDF text area for the new patient
+    setPrescription("");
 
     const { data, error } = await supabase
       .from("patients")
@@ -104,7 +115,6 @@ export function usePatientQueue(selectedDate, isAuthenticated) {
     return { calledPatient: nextPatient };
   };
 
-  // FIXED: No longer attempts to save the prescription to the database, ensuring no crashes
   const handleApprove = async () => {
     if (!selectedPatient?.id) return false;
 
@@ -148,23 +158,37 @@ export function usePatientQueue(selectedDate, isAuthenticated) {
   };
 
   useEffect(() => {
+    // We added profile?.department to the dependency array so it refetches correctly if the role loads late
     if (isAuthenticated) fetchPatients();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, selectedDate]);
+  }, [isAuthenticated, selectedDate, profile?.department]);
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;
+
+    // We update the real-time subscription to specifically listen for patients matching this department
+    let channelFilter = `status=neq.${PATIENT_STATUS.APPROVED}`;
+    if (profile?.department && profile.department !== "General") {
+      channelFilter = `department=eq.${profile.department}`;
+    }
+
     const channel = supabase
       .channel("public:patients")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "patients" },
+        {
+          event: "*",
+          schema: "public",
+          table: "patients",
+          filter: channelFilter,
+        },
         () => fetchPatients(),
       )
       .subscribe();
+
     return () => supabase.removeChannel(channel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, selectedDate]);
+  }, [isAuthenticated, selectedDate, profile?.department]);
 
   return {
     patients,

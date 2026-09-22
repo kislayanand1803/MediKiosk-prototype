@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { supabase } from "../../services/supabaseClient";
 
@@ -13,27 +14,70 @@ import { supabase } from "../../services/supabaseClient";
  * steps this depends on (creating a doctor account, enabling the
  * email/password provider, and locking down data access with RLS).
  */
+
+/**
+ * ==========================================
+ * ROLE-AWARE STAFF LOGIN SCREEN
+ * ==========================================
+ * Authenticates via Supabase, checks the staff_role in the profiles table,
+ * and dynamically routes the user to their specific workspace.
+ */
 export default function LoginScreen({ onBackHome }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const navigate = useNavigate();
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setAuthError("");
     setIsSubmitting(true);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-    setIsSubmitting(false);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
     if (error) {
-      // Deliberately generic — doesn't reveal whether the email exists.
       setAuthError("Invalid email or password. Access denied.");
+      setIsSubmitting(false);
+      return;
     }
-    // On success, the onAuthStateChange listener inside useDoctorSession
-    // picks up the new session and DoctorDashboard switches views on its own.
+
+    // PHASE 2 RBAC: Fetch the role to determine where to send them
+    if (data?.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+
+      setIsSubmitting(false);
+
+      if (profileError || !profile) {
+        setAuthError("Account exists, but no staff profile is configured.");
+        return;
+      }
+
+      // Dynamic Routing based on staff_role
+      switch (profile.role) {
+        case "nurse":
+          navigate("/triage");
+          break;
+        case "pharmacist":
+          navigate("/dispensary");
+          break;
+        case "admin":
+          navigate("/admin");
+          break;
+        case "physician":
+        default:
+          navigate("/doctor");
+          break;
+      }
+    }
   };
 
   return (
@@ -45,7 +89,7 @@ export default function LoginScreen({ onBackHome }) {
           </div>
         </div>
         <div className="text-center space-y-1">
-          <h1 className="text-xl font-black text-white">Physician Secure Portal</h1>
+          <h1 className="text-xl font-black text-white">Staff Secure Portal</h1>
           <p className="text-xs text-slate-400">
             Restricted Area • DPDP Act Compliance & Data Protection
           </p>
@@ -53,26 +97,32 @@ export default function LoginScreen({ onBackHome }) {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label htmlFor="doctorEmail" className="block text-xs font-bold text-slate-300 mb-1">
-              Doctor Email
+            <label
+              htmlFor="staffEmail"
+              className="block text-xs font-bold text-slate-300 mb-1"
+            >
+              Staff Email
             </label>
             <input
-              id="doctorEmail"
+              id="staffEmail"
               type="email"
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="doctor@medikiosk.in"
+              placeholder="staff@medikiosk.in"
               className="w-full px-4 py-3 bg-slate-900 border border-slate-700 text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
               required
             />
           </div>
           <div>
-            <label htmlFor="doctorPassword" className="block text-xs font-bold text-slate-300 mb-1">
+            <label
+              htmlFor="staffPassword"
+              className="block text-xs font-bold text-slate-300 mb-1"
+            >
               Password
             </label>
             <input
-              id="doctorPassword"
+              id="staffPassword"
               type="password"
               autoComplete="current-password"
               value={password}
@@ -84,7 +134,10 @@ export default function LoginScreen({ onBackHome }) {
           </div>
 
           {authError && (
-            <p className="text-xs text-red-400 font-semibold text-center animate-pulse" role="alert">
+            <p
+              className="text-xs text-red-400 font-semibold text-center animate-pulse"
+              role="alert"
+            >
               {authError}
             </p>
           )}

@@ -31,17 +31,17 @@ export function generateEPrescription(
     hour12: true,
   });
 
-  // Doctor & Facility Profile Defaults (Customizable via doctorMeta)
+  // PHASE 2 FIX: Dynamically pull the logged-in doctor's complete profile
   const doctor = {
-    name: doctorMeta.name || "Dr. Rajeshwar Sharma",
-    qualification:
-      doctorMeta.qualification || "BAMS, MD (Ayurveda - Kayachikitsa)",
-    regNo: doctorMeta.regNo || "NCISM/AYU-UP/2018/08492",
+    name: doctorMeta.full_name || "Dr. Rajeshwar Sharma",
+    qualification: doctorMeta.qualification || "BAMS, MD (Ayurveda)",
+    regNo: doctorMeta.reg_no || "NCISM/AYU-UP/2018/08492",
     facility: doctorMeta.facility || "Ayush Integrated Community Health Center",
     address:
       doctorMeta.address ||
       "Sector-12, Institutional Area, Ghaziabad, UP - 201001",
     contact: doctorMeta.contact || "opd@ayush-kiosk.gov.in | +91 120-2984001",
+    department: doctorMeta.department || "General Medicine",
   };
 
   const printWindow = window.open("", "_blank");
@@ -361,7 +361,7 @@ export function generateEPrescription(
               <div class="doctor-name">${doctor.name}</div>
               <div class="doctor-sub">${doctor.qualification}</div>
               <div class="doctor-sub"><strong>Reg. No:</strong> ${doctor.regNo}</div>
-              <div class="doctor-sub" style="color: #0f766e; font-weight: 600; margin-top: 2px;">OPD Unit: Kayachikitsa & Integrative Medicine</div>
+              <div class="doctor-sub" style="color: #0f766e; font-weight: 600; margin-top: 2px;">OPD Unit: ${doctor.department}</div>
             </td>
           </tr>
         </table>

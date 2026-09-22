@@ -21,27 +21,83 @@ import { supabase } from "../../services/supabaseClient";
  * resulting session. See SUPABASE_AUTH_SETUP.md for the one-time
  * dashboard configuration this depends on.
  */
+
+/**
+ * ==========================================
+ * STAFF SESSION HOOK (Phase 2 Upgraded)
+ * ==========================================
+ * Tracks the Supabase Auth session AND fetches the user's role/department
+ * from the public.profiles table to enforce Role-Based Access Control (RBAC).
+ */
 export function useDoctorSession() {
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setIsLoadingSession(false);
-    });
+    let mounted = true;
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
+    async function fetchSessionAndProfile() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    return () => listener.subscription.unsubscribe();
+      if (session?.user) {
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single();
+        if (mounted) {
+          setSession(session);
+          setProfile(prof);
+          setIsLoadingSession(false);
+        }
+      } else {
+        if (mounted) {
+          setSession(null);
+          setProfile(null);
+          setIsLoadingSession(false);
+        }
+      }
+    }
+
+    fetchSessionAndProfile();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      async (_event, newSession) => {
+        if (newSession?.user) {
+          const { data: prof } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", newSession.user.id)
+            .single();
+          if (mounted) {
+            setSession(newSession);
+            setProfile(prof);
+            setIsLoadingSession(false);
+          }
+        } else {
+          if (mounted) {
+            setSession(null);
+            setProfile(null);
+            setIsLoadingSession(false);
+          }
+        }
+      },
+    );
+
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   const logout = () => supabase.auth.signOut();
 
   return {
     session,
+    profile, // NEW: Returns { role, full_name, department, on_shift }
     isAuthenticated: Boolean(session),
     isLoadingSession,
     logout,

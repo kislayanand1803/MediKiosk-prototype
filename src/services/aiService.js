@@ -242,6 +242,14 @@ CRITICAL CLINICAL & AYUSH TRIAGING DIRECTIVES:
 4. MODULE B DOCUMENT DIGITIZATION (CLINICAL ENTITY PARSING):
    - Extract medications, lab values, and timeline events from BOTH the transcript and attached OCR images into JSON arrays.
 
+5. AYUSH DEPARTMENT ROUTING (MILESTONE 2):
+   - Assign the patient to EXACTLY ONE of the following departments based on their condition:
+     "Kayachikitsa" (General Medicine / Internal)
+     "Shalya Tantra" (Surgery / Wounds / Musculoskeletal)
+     "Shalakya Tantra" (ENT / Eye / Head)
+     "Kaumarbhritya" (Pediatrics - ONLY if Age is < 16)
+     "Prasuti Tantra evam Stri Roga" (Gynecology / Obstetrics - ONLY for Female reproductive issues)
+
 ${languageInstruction}`,
       },
     ];
@@ -310,6 +318,16 @@ ${languageInstruction}`,
             enum: ["Routine", "Review Soon", "Urgent"],
           },
           isRedFlag: { type: Type.BOOLEAN },
+          department: {
+            type: Type.STRING,
+            enum: [
+              "Kayachikitsa",
+              "Shalya Tantra",
+              "Shalakya Tantra",
+              "Kaumarbhritya",
+              "Prasuti Tantra evam Stri Roga",
+            ],
+          },
         },
         required: [
           "chiefComplaint",
@@ -327,6 +345,7 @@ ${languageInstruction}`,
           "kaphaScore",
           "urgencyLevel",
           "isRedFlag",
+          "department",
         ],
       },
     };
@@ -368,6 +387,7 @@ ${languageInstruction}`,
         { subject: "Pitta", value: parsedData.pittaScore },
         { subject: "Kapha", value: parsedData.kaphaScore },
       ],
+      department: parsedData.department || "Kayachikitsa",
       token_number: generatedToken,
       status: "Waiting",
     };
@@ -431,6 +451,7 @@ ${languageInstruction}`,
         { subject: "Pitta", value: 65 },
         { subject: "Kapha", value: 35 },
       ],
+      department: "Kayachikitsa",
       token_number: fallbackToken,
       status: "Waiting",
     };

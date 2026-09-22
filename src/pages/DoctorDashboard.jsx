@@ -29,7 +29,9 @@ import DocumentViewerModal from "./dashboard-components/DocumentViewerModal";
  */
 export default function DoctorDashboard() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoadingSession, logout } = useDoctorSession();
+  // PHASE 2: Destructuring 'profile' from our upgraded session hook
+  const { isAuthenticated, isLoadingSession, logout, profile } =
+    useDoctorSession();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const now = useLiveClock(isAuthenticated);
   useIdleLogout(isAuthenticated, logout);
@@ -44,11 +46,11 @@ export default function DoctorDashboard() {
   const [showDocViewer, setShowDocViewer] = useState(false);
   const [copiedFhir, setCopiedFhir] = useState(false);
 
-  // Daily Queue Fetch
-  const queue = usePatientQueue(selectedDate, isAuthenticated);
+  // Daily Queue Fetch (Now department-aware based on the doctor's profile)
+  const queue = usePatientQueue(selectedDate, isAuthenticated, profile);
 
   // ========================================================================
-  // GLOBAL HISTORICAL FETCH FOR ANALYTICS (FIXED RACE CONDITION)
+  // GLOBAL HISTORICAL FETCH FOR ANALYTICS
   // ========================================================================
   const [allPatients, setAllPatients] = useState([]);
 
@@ -59,11 +61,18 @@ export default function DoctorDashboard() {
 
     async function loadAnalytics() {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from("patients")
           .select(
-            "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, primary_complaint, dosha_data",
+            "id, created_at, name, age, gender, abha_id, token_number, status, is_red_flag, primary_complaint, dosha_data, department",
           );
+
+        // PHASE 2 ROUTING: Analytics reflect the doctor's specific department
+        if (profile?.department && profile.department !== "General") {
+          query = query.eq("department", profile.department);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           console.error("Supabase Analytics Fetch Error:", error);
@@ -83,7 +92,7 @@ export default function DoctorDashboard() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, activeTab, queue.patients.length]);
+  }, [isAuthenticated, activeTab, queue.patients.length, profile?.department]);
 
   // If allPatients hasn't finished loading yet, fallback to queue.patients so the UI never displays 0
   const activeDataset = allPatients.length > 0 ? allPatients : queue.patients;
@@ -242,6 +251,7 @@ export default function DoctorDashboard() {
       "Age",
       "Gender",
       "ABHA ID",
+      "Department",
       "Chief Complaint",
       "Status",
       "Priority",
@@ -264,6 +274,7 @@ export default function DoctorDashboard() {
         p.age || "N/A",
         p.gender || "N/A",
         p.abha_id || "Unlinked",
+        p.department || "General",
         complaint,
         p.status || "Pending",
         p.is_red_flag ? "CRITICAL" : "Routine",
@@ -291,7 +302,8 @@ export default function DoctorDashboard() {
   const handleApproveAndGenerateRx = async () => {
     const success = await queue.handleApprove();
     if (success) {
-      generateEPrescription(queue.selectedPatient, queue.prescription);
+      // Pass 'profile' so the prescription prints the correct Doctor Name and Department
+      generateEPrescription(queue.selectedPatient, queue.prescription, profile);
     }
   };
 
@@ -299,6 +311,14 @@ export default function DoctorDashboard() {
 
   const handleSelectPatientWithTimer = (patient) => {
     queue.handleSelectPatient(patient);
+
+    // PHASE 2 AUDIT LOGGING: Record the action of viewing a patient's file
+    if (patient?.id) {
+      supabase
+        .rpc("log_patient_view", { p_patient_id: patient.id })
+        .catch(() => {});
+    }
+
     if (
       patient.status === PATIENT_STATUS.IN_CONSULTATION &&
       !queue.consultationStartTime
@@ -309,7 +329,13 @@ export default function DoctorDashboard() {
 
   const handleCallNext = async () => {
     const result = await queue.handleCallNextPatient();
-    if (result.calledPatient) setQueueFilter(PATIENT_STATUS.IN_CONSULTATION);
+    if (result.calledPatient) {
+      setQueueFilter(PATIENT_STATUS.IN_CONSULTATION);
+      // Log viewing the patient called next
+      supabase
+        .rpc("log_patient_view", { p_patient_id: result.calledPatient.id })
+        .catch(() => {});
+    }
     return result;
   };
 
