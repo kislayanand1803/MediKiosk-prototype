@@ -9,6 +9,7 @@ import DoctorDashboard from "./pages/DoctorDashboard";
 import VerifyPage from "./pages/VerifyPage";
 import TriageDashboard from "./pages/TriageDashboard";
 import PharmacyDashboard from "./pages/PharmacyDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 // Temporary Placeholder Component for Phase 2 Roles
 const PlaceholderView = ({ title, role }) => (
@@ -62,12 +63,7 @@ function App() {
           <Route path="/doctor" element={<DoctorDashboard />} />
           <Route path="/triage" element={<TriageDashboard />} />
           <Route path="/dispensary" element={<PharmacyDashboard />} />
-          <Route
-            path="/admin"
-            element={
-              <PlaceholderView title="Command Center" role="Administrator" />
-            }
-          />
+          <Route path="/admin" element={<AdminDashboard />} />
 
           {/* AUTOMATIC REDIRECT: Catches /home or any typo and sends them safely to the landing page */}
           <Route path="*" element={<Navigate to="/" replace />} />

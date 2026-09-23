@@ -22,7 +22,6 @@ const MODEL_FALLBACK_CHAIN = [
   "gemini-3-flash",
 ];
 
-// INCREASED TIMEOUT: 30 seconds allows multimodal OCR & schema processing
 const timeoutPromise = (ms) =>
   new Promise((_, reject) =>
     setTimeout(() => reject(new Error(`API Timeout after ${ms}ms`)), ms),
@@ -43,7 +42,6 @@ async function executeWithModelFallback(promptParts, config) {
         config: config,
       });
 
-      // 30,000ms ensures multimodal documents have ample time to process
       const response = await Promise.race([request, timeoutPromise(30000)]);
       console.log(`✅ Success with model: ${modelName}`);
       return response;
@@ -65,7 +63,6 @@ function safeJsonParse(rawText) {
       .replace(/```json/gi, "")
       .replace(/```/g, "")
       .trim();
-    // Regex fix for trailing commas before closing brackets
     cleanText = cleanText.replace(/,\s*([\]}])/g, "$1");
     return JSON.parse(cleanText);
   } catch (error) {
@@ -170,11 +167,6 @@ export function deterministicRedFlagCheck(chatHistory) {
   return findings;
 }
 
-/**
- * =========================================================
- * SECURE TOKEN GENERATOR
- * =========================================================
- */
 async function getNextToken() {
   try {
     const { data, error } = await supabase.rpc("get_next_daily_token");
@@ -200,7 +192,6 @@ export async function generateMedicalCaseSummary(
     const hasDeterministicRedFlag = deterministicFlags.length > 0;
 
     const languageInstruction = `Provide all descriptive text summaries in clear, professional medical English for the doctor portal, while accurately translating the patient's ${language} input.
-    
     CRITICAL DATA PROVENANCE: 
     Prepend the exact emoji to the beginning of the text fields (chiefComplaint, symptomsSummary, possibleDiagnosis, extractedDocNotes) based on the source:
     - 🗣️ If the patient explicitly said it in the chat.
@@ -215,9 +206,9 @@ export async function generateMedicalCaseSummary(
     const parts = [
       {
         text: `Patient Demographics:
-- Name: ${patientInfo?.name || "Rahul Sharma"}
-- Age: ${patientInfo?.age || "28"}
-- Gender: ${patientInfo?.gender || "Male"}
+- Name: ${patientInfo?.name || "Unknown Patient"}
+- Age: ${patientInfo?.age || "N/A"}
+- Gender: ${patientInfo?.gender || "Unknown"}
 - ABHA ID: ${patientInfo?.abhaId || "Not Linked"}
 
 Analyze the following patient-AI Ayush Prashna Pariksha transcript and any attached medical document image.
@@ -227,29 +218,16 @@ ${formattedTranscript}
 
 CRITICAL CLINICAL & AYUSH TRIAGING DIRECTIVES:
 1. VIKRITI (DOSHA IMBALANCE) SCORING:
-   - vataScore, pittaScore, and kaphaScore MUST be integers between 0 and 100 representing current pathological imbalance.
-   - Normal baseline: 15-30%
-   - Moderate aggravation: 45-65%
-   - Acute / severe pathological aggravation: 70-95%
-
+   - vataScore, pittaScore, and kaphaScore MUST be integers between 0 and 100.
 2. AYUSH CLINICAL PARIKSHA:
-   - Identify Agni status: Vishamagni, Tikshnagni, Mandagni, or Samagni.
-   - Identify Koshtha status: Krura Koshtha, Mridu Koshtha, or Madhyama Koshtha.
-   - Provide Ahara-Vihara (dietary and lifestyle) guidance.
-
+   - Identify Agni status and Koshtha status. Provide Ahara-Vihara guidance.
 3. ACUTE OCR & SURGICAL RED-FLAG OVERRIDE:
-   - If the document image shows acute structural/pathological findings, set isRedFlag to true and urgencyLevel to "Urgent".
-
-4. MODULE B DOCUMENT DIGITIZATION (CLINICAL ENTITY PARSING):
-   - Extract medications, lab values, and timeline events from BOTH the transcript and attached OCR images into JSON arrays.
-
+   - If acute findings exist, set isRedFlag to true and urgencyLevel to "Urgent".
+4. MODULE B DOCUMENT DIGITIZATION:
+   - Extract medications, lab values, and timeline events into arrays.
 5. AYUSH DEPARTMENT ROUTING (MILESTONE 2):
    - Assign the patient to EXACTLY ONE of the following departments based on their condition:
-     "Kayachikitsa" (General Medicine / Internal)
-     "Shalya Tantra" (Surgery / Wounds / Musculoskeletal)
-     "Shalakya Tantra" (ENT / Eye / Head)
-     "Kaumarbhritya" (Pediatrics - ONLY if Age is < 16)
-     "Prasuti Tantra evam Stri Roga" (Gynecology / Obstetrics - ONLY for Female reproductive issues)
+     "Kayachikitsa", "Shalya Tantra", "Shalakya Tantra", "Kaumarbhritya", "Prasuti Tantra evam Stri Roga", "General"
 
 ${languageInstruction}`,
       },
@@ -321,7 +299,6 @@ ${languageInstruction}`,
           isRedFlag: { type: Type.BOOLEAN },
           department: {
             type: SchemaType.STRING,
-            description: "The Ayush department to route the patient to.",
             enum: [
               "Kayachikitsa",
               "Shalya Tantra",
@@ -361,13 +338,32 @@ ${languageInstruction}`,
       ? "Urgent"
       : parsedData.urgencyLevel;
 
+    // SHIFT-AWARE ROUTING INTERCEPT
+    let targetDepartment = parsedData.department || "General";
+
+    if (targetDepartment !== "General") {
+      const { data: activeDocs, error: shiftError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("role", "physician")
+        .eq("department", targetDepartment)
+        .eq("on_shift", true)
+        .limit(1);
+
+      if (shiftError || !activeDocs || activeDocs.length === 0) {
+        console.warn(
+          `No active physician in ${targetDepartment}, rerouting to General.`,
+        );
+        targetDepartment = "General";
+      }
+    }
+
     const generatedToken = await getNextToken();
 
-    // STRICT MATCH: Only schema-existing columns are included
     const baseCaseData = {
-      name: patientInfo?.name || "Rahul Sharma",
-      age: patientInfo?.age || "28",
-      gender: patientInfo?.gender || "Male",
+      name: patientInfo?.name || "Unknown Patient",
+      age: patientInfo?.age || "N/A",
+      gender: patientInfo?.gender || "Unknown",
       abha_id:
         patientInfo?.abhaId && patientInfo.abhaId.trim() !== ""
           ? patientInfo.abhaId
@@ -385,12 +381,13 @@ ${languageInstruction}`,
       ahara_vihara: parsedData.aharaVihara,
       urgency_level: finalUrgency,
       is_red_flag: finalIsRedFlag,
+      is_ai_fallback: false,
       dosha_data: [
         { subject: "Vata", value: parsedData.vataScore },
         { subject: "Pitta", value: parsedData.pittaScore },
         { subject: "Kapha", value: parsedData.kaphaScore },
       ],
-      department: parsedData.department || "Kayachikitsa",
+      department: targetDepartment,
       token_number: generatedToken,
       status: "Waiting",
     };
@@ -402,59 +399,54 @@ ${languageInstruction}`,
       .from("patients")
       .insert([finalCaseData])
       .select();
-
-    if (dbError) {
+    if (dbError)
       console.error(
         "Error saving patient to Supabase:",
         dbError.message,
         dbError.details,
       );
-    }
 
     return { ...finalCaseData, ...(dbData?.[0] || {}) };
   } catch (apiError) {
     console.warn(
-      "⚠️ All models in fallback chain failed. Engaging demo fallback mode:",
-      apiError.message,
+      "⚠️ All models in fallback chain failed. Engaging manual triage fallback mode.",
     );
 
     const fallbackToken = await getNextToken();
+    const formattedHistory =
+      typeof chatHistory === "string"
+        ? chatHistory
+        : JSON.stringify(chatHistory);
 
     const fallbackData = {
-      name: patientInfo?.name || "Rahul Sharma",
-      age: patientInfo?.age || "28",
-      gender: patientInfo?.gender || "Male",
+      name: patientInfo?.name || "Unknown Patient",
+      age: patientInfo?.age || "N/A",
+      gender: patientInfo?.gender || "Unknown",
       abha_id:
         patientInfo?.abhaId && patientInfo.abhaId.trim() !== ""
           ? patientInfo.abhaId
           : "Not Linked",
-      primary_complaint: "🗣️ Severe Throbbing Headache & Acid Indigestion",
-      subjective_history:
-        "🗣️ Patient reports intense throbbing headache and sour belching.",
-      possible_diagnosis: "🤖 Vata-Pitta Shiroroga / Migraine",
-      extracted_doc_notes: "📄 Prior prescription OCR: Paracetamol 650mg SOS.",
-      medications: [
-        { drugName: "Paracetamol", dosage: "650mg", duration: "SOS" },
-      ],
-      lab_values: [
-        { testName: "Hemoglobin", result: "11.2 g/dL", isAbnormal: true },
-      ],
-      timeline: [
-        { date: "2 days ago", event: "Fever and throbbing headache started" },
-        { date: "Yesterday", event: "Took Paracetamol 650mg" },
-      ],
+      primary_complaint:
+        "⚠️ AI Unavailable: Manual routing and triage required.",
+      subjective_history: `Raw Patient Input:\n${formattedHistory}`,
+      possible_diagnosis: "Pending Manual Triage",
+      extracted_doc_notes: "OCR unavailable. Review physical documents.",
+      medications: [],
+      lab_values: [],
+      timeline: [],
       document_images: uploadedDocs || [],
-      agni_status: "Vishamagni (Irregular digestion)",
-      koshtha_status: "Krura Koshtha (Hard/Constipated bowels)",
-      ahara_vihara: "Irregular diet and erratic sleep schedule.",
+      agni_status: "Pending",
+      koshtha_status: "Pending",
+      ahara_vihara: "Pending",
       urgency_level: "Review Soon",
       is_red_flag: false,
+      is_ai_fallback: true,
       dosha_data: [
-        { subject: "Vata", value: 78 },
-        { subject: "Pitta", value: 65 },
-        { subject: "Kapha", value: 35 },
+        { subject: "Vata", value: 50 },
+        { subject: "Pitta", value: 50 },
+        { subject: "Kapha", value: 50 },
       ],
-      department: "Kayachikitsa",
+      department: "General",
       token_number: fallbackToken,
       status: "Waiting",
     };
@@ -469,14 +461,12 @@ ${languageInstruction}`,
       .from("patients")
       .insert([finalFallbackData])
       .select();
-
-    if (fbError) {
+    if (fbError)
       console.error(
         "Error saving fallback patient to Supabase:",
         fbError.message,
         fbError.details,
       );
-    }
 
     return { ...finalFallbackData, ...(fbData?.[0] || {}) };
   }
@@ -502,19 +492,19 @@ export async function generateNextChatResponse(
     let clinicalDirective = "";
     switch (step) {
       case 1:
-        clinicalDirective = `PHASE 1: Chief Complaint. Ask ONE focused clinical follow-up question to narrow down the reported symptom location or onset.`;
+        clinicalDirective = `PHASE 1: Chief Complaint. Ask ONE focused clinical follow-up question.`;
         break;
       case 2:
-        clinicalDirective = `PHASE 2: Digestion & Agni. Ask ONE targeted question about appetite, digestion, or bowel regularity.`;
+        clinicalDirective = `PHASE 2: Digestion & Agni. Ask ONE targeted question about appetite, digestion.`;
         break;
       case 3:
-        clinicalDirective = `PHASE 3: Sleep & Energy. Ask ONE targeted question about sleep quality, fatigue, or stress.`;
+        clinicalDirective = `PHASE 3: Sleep & Energy. Ask ONE targeted question about sleep quality, fatigue.`;
         break;
       case 4:
-        clinicalDirective = `PHASE 4: Lifestyle & Vihara. Ask ONE targeted question about daily routine or physical exertion.`;
+        clinicalDirective = `PHASE 4: Lifestyle & Vihara. Ask ONE targeted question about daily routine.`;
         break;
       case 5:
-        clinicalDirective = `PHASE 5: Diet & Ahara. Ask ONE targeted question about regular dietary habits or food triggers.`;
+        clinicalDirective = `PHASE 5: Diet & Ahara. Ask ONE targeted question about regular dietary habits.`;
         break;
       default:
         clinicalDirective = `Ask ONE brief summary confirmation question.`;
@@ -530,8 +520,7 @@ CRITICAL SAFETY & ROLE RULES:
 If the patient reports symptoms indicating an acute medical emergency:
 - You MUST set "critical_symptom_detected" to true IMMEDIATELY.
 - In "question", output a concise, urgent warning directing the patient to alert the hospital staff immediately.
-- DO NOT continue asking conversational routine intake questions.
-- DO NOT ask questions about locking doors or dispatching vehicles.`;
+- DO NOT continue asking conversational routine intake questions.`;
 
     const langInstruction = `CRITICAL LANGUAGE REQUIREMENT: Output the response JSON entirely in fluent ${language} script and vocabulary.`;
 

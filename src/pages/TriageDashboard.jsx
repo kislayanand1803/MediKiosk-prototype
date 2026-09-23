@@ -307,8 +307,13 @@ export default function TriageDashboard() {
                     }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <div className="font-bold text-gray-900 dark:text-white text-sm">
+                      <div className="font-bold text-gray-900 dark:text-white text-sm flex items-center">
                         {p.name}
+                        {p.is_ai_fallback && (
+                          <span className="bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 text-[9px] font-black uppercase px-2 py-0.5 rounded-sm tracking-wider ml-2">
+                            Fallback
+                          </span>
+                        )}
                       </div>
                       <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 dark:bg-slate-900 px-2 py-1 rounded">
                         {p.token_number}
@@ -360,6 +365,27 @@ export default function TriageDashboard() {
                 </div>
 
                 <div className="p-6 flex-1 overflow-y-auto">
+                  {/* AI Fallback Warning Banner */}
+                  {queue.selectedPatient?.is_ai_fallback && (
+                    <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 p-4 rounded-xl mb-6 flex items-start gap-3">
+                      <AlertTriangle
+                        className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
+                        size={20}
+                      />
+                      <div>
+                        <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                          AI Triage Unavailable
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">
+                          This patient was routed via network fallback. The
+                          clinical summary could not be generated. Please review
+                          their raw input carefully and complete the Pariksha
+                          (assessment) manually.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mb-6">
                     <h3 className="text-sm font-bold text-gray-800 dark:text-slate-200 mb-2">
                       Chief Complaint (From Kiosk)
