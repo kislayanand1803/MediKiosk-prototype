@@ -30,17 +30,14 @@ export function generateEPrescription(patient, prescriptionText, doctorMeta) {
   // Safely handle if the dashboard explicitly passes 'null'
   const safeDoctorMeta = doctorMeta || {};
 
-  // Robust name resolution
+  // Robust name resolution (Removed Rajeshwar Sharma demo fallbacks)
   let resolvedName =
-    safeDoctorMeta.full_name || safeDoctorMeta.name || "Dr. Rajeshwar Sharma";
+    safeDoctorMeta.full_name || safeDoctorMeta.name || "Consulting Physician";
 
   if (
-    resolvedName.toLowerCase() === "nurse" ||
-    resolvedName.toLowerCase() === "doctor"
+    !resolvedName.toLowerCase().startsWith("dr") &&
+    !resolvedName.toLowerCase().startsWith("consulting")
   ) {
-    resolvedName = "Dr. Rajeshwar Sharma (Demo)";
-  }
-  if (!resolvedName.toLowerCase().startsWith("dr")) {
     resolvedName = `Dr. ${resolvedName}`;
   }
 
@@ -67,11 +64,10 @@ export function generateEPrescription(patient, prescriptionText, doctorMeta) {
   }
 
   // PHASE 2 FIX: Extract and strictly DEDUPLICATE Vitals
-  // (Prevents overlapping grids if multiple readings were saved to the array)
   const rawVitals = (patient.lab_values || []).filter((v) =>
     [
       "temperature",
-      "heart rate", // Matches what TriageDashboard actually saves
+      "heart rate",
       "pulse rate",
       "blood pressure",
       "spo2",
@@ -82,8 +78,6 @@ export function generateEPrescription(patient, prescriptionText, doctorMeta) {
   const uniqueVitalsMap = new Map();
   rawVitals.forEach((v) => {
     if (v.testName) {
-      // By using the test name as the key, later duplicates overwrite earlier ones,
-      // ensuring the prescription only prints the most recent reading.
       uniqueVitalsMap.set(v.testName.toLowerCase(), v);
     }
   });
