@@ -8,6 +8,15 @@ const PATIENT_LIST_COLUMNS =
 const PATIENT_DETAIL_COLUMNS =
   "subjective_history, extracted_doc_notes, medications, lab_values, timeline, document_images, triaged_at";
 
+// HELPER: Strict local sorting to ensure Red Flags always jump to index 0
+const sortPatientsByPriority = (patientList) => {
+  return [...patientList].sort((a, b) => {
+    if (a.is_red_flag && !b.is_red_flag) return -1;
+    if (!a.is_red_flag && b.is_red_flag) return 1;
+    return new Date(a.created_at) - new Date(b.created_at);
+  });
+};
+
 export function usePatientQueue(selectedDate, isAuthenticated, profile) {
   const [patients, setPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -43,12 +52,14 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
       return;
     }
 
-    setPatients(data);
-    if (data.length > 0) {
+    const sortedData = sortPatientsByPriority(data);
+    setPatients(sortedData);
+
+    if (sortedData.length > 0) {
       const isCurrentPatientStillInList =
-        selectedPatient && data.find((p) => p.id === selectedPatient.id);
+        selectedPatient && sortedData.find((p) => p.id === selectedPatient.id);
       if (!isCurrentPatientStillInList) {
-        handleSelectPatient(data[0]);
+        handleSelectPatient(sortedData[0]);
       }
     } else {
       setSelectedPatient(null);
@@ -76,10 +87,14 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
   };
 
   const handleCallNextPatient = async () => {
-    // STRICT FIX: Only call patients who are waiting AND have passed triage
-    const nextPatient = patients.find(
+    // We enforce a local sort right before finding the next patient
+    // to ensure an escalated patient is always pulled first, even if real-time sync is lagging.
+    const prioritySortedPatients = sortPatientsByPriority(patients);
+
+    const nextPatient = prioritySortedPatients.find(
       (p) => p.status === PATIENT_STATUS.WAITING && p.triaged_at,
     );
+
     if (!nextPatient) return { calledPatient: null };
 
     const { error } = await supabase
@@ -90,12 +105,15 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
     if (error) return { calledPatient: null, error };
 
     setPatients((prev) =>
-      prev.map((p) =>
-        p.id === nextPatient.id
-          ? { ...p, status: PATIENT_STATUS.IN_CONSULTATION }
-          : p,
+      sortPatientsByPriority(
+        prev.map((p) =>
+          p.id === nextPatient.id
+            ? { ...p, status: PATIENT_STATUS.IN_CONSULTATION }
+            : p,
+        ),
       ),
     );
+
     handleSelectPatient({
       ...nextPatient,
       status: PATIENT_STATUS.IN_CONSULTATION,
@@ -115,10 +133,12 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
 
     if (!error) {
       setPatients((prev) =>
-        prev.map((p) =>
-          p.id === selectedPatient.id
-            ? { ...p, status: PATIENT_STATUS.APPROVED }
-            : p,
+        sortPatientsByPriority(
+          prev.map((p) =>
+            p.id === selectedPatient.id
+              ? { ...p, status: PATIENT_STATUS.APPROVED }
+              : p,
+          ),
         ),
       );
       setSelectedPatient((prev) => ({
@@ -180,7 +200,7 @@ export function usePatientQueue(selectedDate, isAuthenticated, profile) {
 
   return {
     patients,
-    setPatients, // STRICT FIX: Exposed to allow instantaneous local UI updates
+    setPatients,
     selectedPatient,
     isEditing,
     caseNotes,

@@ -115,9 +115,15 @@ export default function DoctorDashboard() {
   // Use allPatients directly. If it's an empty month, we want it to show 0, not fallback to today's queue.
   const activeDataset = allPatients;
   // Create a strict list of valid patients for the physician queue
-  const validQueuePatients = queue.patients.filter(
-    (p) => p.status !== PATIENT_STATUS.WAITING || p.triaged_at,
-  );
+  const validQueuePatients = queue.patients
+    .filter((p) => p.status !== PATIENT_STATUS.WAITING || p.triaged_at)
+    .sort((a, b) => {
+      // 1. Enforce red-flag override locally so it instantly jumps to index 0
+      if (a.is_red_flag && !b.is_red_flag) return -1;
+      if (!a.is_red_flag && b.is_red_flag) return 1;
+      // 2. Fall back to standard chronological queueing
+      return new Date(a.created_at) - new Date(b.created_at);
+    });
   // Ensure the auto-selected patient is actually in this valid list
   const validSelectedPatient =
     queue.selectedPatient &&
