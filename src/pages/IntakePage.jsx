@@ -26,11 +26,72 @@ export default function IntakePage() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
 
-  const [name, setName] = useState("");
-  const [age, setAge] = useState("");
-  const [gender, setGender] = useState("");
-  const [abhaId, setAbhaId] = useState("");
-  const [hasConsent, setHasConsent] = useState(false);
+  /**
+   * --------------------------------------------------------------------------
+   * PHASE 2: CONSOLIDATED INTAKE AUTOSAVE
+   * --------------------------------------------------------------------------
+   * Previously each field had its own sessionStorage key written in a
+   * separate useEffect — five effects, five storage writes per keystroke,
+   * and the language selection was never saved at all (so a reload always
+   * defaulted back to English mid-intake).
+   *
+   * Now:
+   *  - A single "kiosk_intake_draft" key holds the entire form state as one
+   *    JSON object. One read on mount, one write per change — less storage
+   *    churn, and atomically consistent (no half-written form where name
+   *    updated but gender didn't yet).
+   *  - The selected language ("kiosk_intake_lang") is saved separately so it
+   *    can be restored before the i18n system initializes the rest of the form.
+   *  - The old per-field keys (kiosk_intake_name, kiosk_intake_age, etc.) are
+   *    cleaned up on the first save so they don't accumulate as stale data.
+   *
+   * SECURITY: sessionStorage is tab-scoped and cleared when the tab closes,
+   * matching the PHI retention model used everywhere else in the kiosk flow.
+   */
+  const restoreDraft = () => {
+    try {
+      const raw = sessionStorage.getItem("kiosk_intake_draft");
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const draft = restoreDraft();
+
+  const [name, setName] = useState(draft.name || "");
+  const [age, setAge] = useState(draft.age || "");
+  const [gender, setGender] = useState(draft.gender || "");
+  const [abhaId, setAbhaId] = useState(draft.abhaId || "");
+  const [hasConsent, setHasConsent] = useState(draft.hasConsent || false);
+
+  // Restore language selection if the patient changed it before a reload.
+  useEffect(() => {
+    const savedLang = sessionStorage.getItem("kiosk_intake_lang");
+    if (savedLang && savedLang !== i18n.language) {
+      i18n.changeLanguage(savedLang);
+    }
+  }, []);
+
+  // Write the whole form + language as one atomic object on any change.
+  // Also cleans up the old per-field keys on first write so they don't
+  // linger as stale data alongside the new consolidated key.
+  useEffect(() => {
+    sessionStorage.setItem(
+      "kiosk_intake_draft",
+      JSON.stringify({ name, age, gender, abhaId, hasConsent }),
+    );
+    sessionStorage.setItem("kiosk_intake_lang", i18n.language);
+
+    // One-time cleanup of the old per-field keys from the previous implementation.
+    [
+      "kiosk_intake_name",
+      "kiosk_intake_age",
+      "kiosk_intake_gender",
+      "kiosk_intake_abha",
+      "kiosk_intake_consent",
+    ].forEach((k) => sessionStorage.removeItem(k));
+  }, [name, age, gender, abhaId, hasConsent, i18n.language]);
 
   // ABDM Milestone 1 Auth States
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -43,7 +104,7 @@ export default function IntakePage() {
     setName("Prachi Sharma");
     setAge("20");
     setGender("Female");
-    setAbhaId("91-4582-1923-8821");
+    setAbhaId("[ABHA ID Redacted]");
     setHasConsent(true);
   };
 
@@ -141,6 +202,15 @@ export default function IntakePage() {
           gender: data.patientDetails.gender || gender,
           abhaId,
         };
+
+        /**
+         * FIX: Demographic Loss in ABHA OTP Verification (Defect #4)
+         * Persist active_kiosk_patient snapshot so location.state survives reloads[cite: 3].
+         */
+        sessionStorage.setItem(
+          "active_kiosk_patient",
+          JSON.stringify(patientInfo),
+        );
         navigate("/chat", { state: { patientInfo } });
       } else {
         alert(data.error); // Show "Invalid OTP" error
@@ -161,12 +231,22 @@ export default function IntakePage() {
 
     if ("speechSynthesis" in window) window.speechSynthesis.cancel();
 
-    // If patient entered an ABHA ID, route them through the strict ABDM M1 Auth Flow
+    const patientInfo = {
+      name: name.trim() || "Unknown Patient",
+      age: age.trim() || "N/A",
+      gender: gender || "Unknown",
+      abhaId: abhaId && abhaId.trim() !== "" ? abhaId.trim() : "Not Linked",
+    };
+
+    // Persist the final patient snapshot for ChatPage to recover on refresh.
+    // The intake draft is kept alive until PatientSuccessPage's handleSecureExit
+    // wipes all kiosk storage — don't clear it here in case the patient goes
+    // back from /chat to /intake and needs their form pre-filled.
+    sessionStorage.setItem("active_kiosk_patient", JSON.stringify(patientInfo));
+
     if (abhaId && abhaId.trim() !== "") {
       initiateAbhaAuth();
     } else {
-      // Proceed unlinked if they chose not to enter an ABHA ID
-      const patientInfo = { name, age, gender, abhaId: "Not Linked" };
       navigate("/chat", { state: { patientInfo } });
     }
   };

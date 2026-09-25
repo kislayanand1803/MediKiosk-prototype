@@ -101,22 +101,81 @@ export default function ChatPage() {
   const emText =
     EMERGENCY_TRANSLATIONS[currentLang] || EMERGENCY_TRANSLATIONS.en;
 
-  const patientInfo = location.state?.patientInfo || {
-    name: "Prachi Sharma",
-    age: "20",
-    gender: "Female",
-    abhaId: "91-4582-1923-8821",
-  };
+  /**
+   * --------------------------------------------------------------------------
+   * PHASE 2: CHAT SESSION PERSISTENCE — patientInfo recovery
+   * --------------------------------------------------------------------------
+   * If the patient refreshes mid-chat, location.state is gone (React Router
+   * doesn't persist state across reloads). Fall back to the snapshot written
+   * by IntakePage's startConsultation so the header, AI greeting, and final
+   * report still have the correct name/age/gender/ABHA instead of the
+   * hard-coded demo values.
+   */
+  const patientInfo =
+    location.state?.patientInfo ||
+    (() => {
+      try {
+        const saved = sessionStorage.getItem("active_kiosk_patient");
+        return saved
+          ? JSON.parse(saved)
+          : {
+              name: "Prachi Sharma",
+              age: "20",
+              gender: "Female",
+              abhaId: "[ABHA ID Redacted]",
+            };
+      } catch {
+        return {
+          name: "Prachi Sharma",
+          age: "20",
+          gender: "Female",
+          abhaId: "[ABHA ID Redacted]",
+        };
+      }
+    })();
 
   const currentLangObj = LANGUAGES.find((l) => l.code === currentLang) || {
     label: "English",
   };
   const languageName = currentLangObj.label.split(" ")[0];
 
-  const [messages, setMessages] = useState([]);
+  /**
+   * --------------------------------------------------------------------------
+   * PHASE 2: CHAT SESSION PERSISTENCE — messages & step recovery
+   * --------------------------------------------------------------------------
+   * Restores the message history and intake step from sessionStorage so a
+   * reload mid-interview doesn't wipe the patient's conversation progress.
+   *
+   * WHAT IS AND ISN'T SAVED:
+   * - Saved: messages array (text + sender), current step index.
+   * - Not saved: uploadedDocs (base64 blobs — too large for sessionStorage,
+   *   and the patient can re-upload), voice state (default-on is safer than
+   *   remembering off), AI thinking state (transient), emergency state
+   *   (if the page reloads mid-emergency, a fresh restart is safer).
+   *
+   * WRITE STRATEGY: written on every messages/step change (see useEffect
+   * below), cleared only when PatientSuccessPage's handleSecureExit runs.
+   */
+  const restoreChatSession = () => {
+    try {
+      const savedMessages = sessionStorage.getItem("kiosk_chat_messages");
+      const savedStep = sessionStorage.getItem("kiosk_chat_step");
+      return {
+        messages: savedMessages ? JSON.parse(savedMessages) : [],
+        step: savedStep ? parseInt(savedStep, 10) : 1,
+      };
+    } catch {
+      return { messages: [], step: 1 };
+    }
+  };
+
+  const chatSession = restoreChatSession();
+  const isRestoredSession = chatSession.messages.length > 0;
+
+  const [messages, setMessages] = useState(chatSession.messages);
   const [dynamicChips, setDynamicChips] = useState([]);
   const [input, setInput] = useState("");
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(chatSession.step);
   const [isVoiceOn, setIsVoiceOn] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAiThinking, setIsAiThinking] = useState(false);
@@ -217,7 +276,32 @@ export default function ChatPage() {
     }
   };
 
+  /**
+   * Write messages and step to sessionStorage on every change.
+   * This is the "autosave" — continuous, silent, per-turn.
+   * Not debounced intentionally: a message is only added after an AI
+   * response completes, so this fires at most once per conversation turn,
+   * not on every keystroke.
+   */
   useEffect(() => {
+    if (messages.length > 0) {
+      sessionStorage.setItem("kiosk_chat_messages", JSON.stringify(messages));
+    }
+  }, [messages]);
+
+  useEffect(() => {
+    sessionStorage.setItem("kiosk_chat_step", String(step));
+  }, [step]);
+
+  useEffect(() => {
+    // Skip the greeting and chip setup if we're restoring a previous session —
+    // the messages are already in state from sessionStorage, and firing the
+    // greeting again would duplicate it at the top of the restored history.
+    if (isRestoredSession) {
+      chatInitialized.current = true;
+      return;
+    }
+
     if (chatInitialized.current) return;
     chatInitialized.current = true;
 
@@ -415,7 +499,11 @@ export default function ChatPage() {
         languageName,
       );
 
-      if (patientInfo.abhaId && patientInfo.abhaId !== "Not Linked") {
+      if (
+        patientInfo.abhaId &&
+        patientInfo.abhaId !== "Not Linked" &&
+        patientInfo.abhaId !== "[ABHA ID Redacted]"
+      ) {
         try {
           console.log("Initiating ABDM Care Context Linking...");
           const linkRes = await fetch(
@@ -442,12 +530,42 @@ export default function ChatPage() {
         }
       }
 
+      /**
+       * FIX: Deterministic Database Write Verification
+       * Supabase automatically assigns an 'id' on successful insert. If the 'id'
+       * is missing, it guarantees the record only exists locally and must be queued.
+       */
+      const isDatabaseWriteFailed = !navigator.onLine || !aiResult?.id;
+
+      if (
+        isDatabaseWriteFailed &&
+        aiResult &&
+        window.__kioskOffline?.addToOutbox
+      ) {
+        console.info(
+          "[ChatPage] Database write failed or offline — queuing patient record to outbox.",
+        );
+        window.__kioskOffline.addToOutbox(aiResult);
+      }
+
       navigate("/success", {
         state: { currentCase: aiResult, appLanguage: currentLang },
       });
     } catch (error) {
       console.error("AI Intake failed:", error);
-      alert("Failed to analyze case. Please verify your Gemini API key.");
+
+      /**
+       * PHASE 3 + PHASE 1 INTERACTION:
+       * If the AI call itself fails (not just the DB insert — e.g. the
+       * Gemini key is invalid or the API is unreachable), we land here.
+       * Rather than showing a raw alert that a patient can't act on, show
+       * a user-facing message that matches the kiosk's literacy-first design.
+       * The KioskErrorBoundary above won't catch this because it's a caught
+       * async error, not an unhandled render error — so we handle it inline.
+       */
+      alert(
+        "The AI system is temporarily unavailable. Please inform a staff member at the counter. Your interview notes have been saved locally.",
+      );
       setIsAnalyzing(false);
     }
   };
