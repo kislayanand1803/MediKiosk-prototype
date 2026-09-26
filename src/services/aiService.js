@@ -16,7 +16,6 @@ const globalAiClient = apiKey ? new GoogleGenAI({ apiKey }) : null;
 const MODEL_FALLBACK_CHAIN = [
   "gemini-3.8-flash",
   "gemini-3.7-flash",
-  "gemini-3.1-pro-preview",
   "gemini-3-flash-preview",
   "gemini-3.1-flash-lite",
   "gemini-3.6-flash",
@@ -225,11 +224,13 @@ CRITICAL CLINICAL & AYUSH TRIAGING DIRECTIVES:
    - vataScore, pittaScore, and kaphaScore MUST be integers between 0 and 100.
 2. AYUSH CLINICAL PARIKSHA:
    - Identify Agni status and Koshtha status. Provide Ahara-Vihara guidance.
-3. ACUTE OCR & SURGICAL RED-FLAG OVERRIDE:
+3. ABDM / NAMASTE CODING:
+   - Provide a highly probable SNOMED-CT or NAMASTE diagnostic code (as a string) mapping to the possibleDiagnosis.
+4. ACUTE OCR & SURGICAL RED-FLAG OVERRIDE:
    - If acute findings exist, set isRedFlag to true and urgencyLevel to "Urgent".
-4. MODULE B DOCUMENT DIGITIZATION:
+5. MODULE B DOCUMENT DIGITIZATION:
    - Extract medications, lab values, and timeline events into arrays.
-5. AYUSH DEPARTMENT ROUTING (MILESTONE 2):
+6. AYUSH DEPARTMENT ROUTING (MILESTONE 2):
    - Assign the patient to EXACTLY ONE of the following departments based on their condition:
      "Kayachikitsa", "Shalya Tantra", "Shalakya Tantra", "Kaumarbhritya", "Prasuti Tantra evam Stri Roga", "General"
 
@@ -249,7 +250,7 @@ ${languageInstruction}`,
     const config = {
       temperature: 0.1,
       systemInstruction:
-        "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician. Extract structured entities accurately.",
+        "You are an expert integrative clinical triage assistant and Ayurvedic diagnostician. Extract structured entities accurately, including SNOMED-CT or NAMASTE diagnostic codes.",
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
@@ -257,6 +258,7 @@ ${languageInstruction}`,
           chiefComplaint: { type: Type.STRING },
           symptomsSummary: { type: Type.STRING },
           possibleDiagnosis: { type: Type.STRING },
+          diagnosisCode: { type: Type.STRING },
           extractedDocNotes: { type: Type.STRING },
           medications: {
             type: Type.ARRAY,
@@ -317,6 +319,7 @@ ${languageInstruction}`,
           "chiefComplaint",
           "symptomsSummary",
           "possibleDiagnosis",
+          "diagnosisCode",
           "extractedDocNotes",
           "medications",
           "labValues",
@@ -375,6 +378,7 @@ ${languageInstruction}`,
       primary_complaint: parsedData.chiefComplaint,
       subjective_history: parsedData.symptomsSummary,
       possible_diagnosis: parsedData.possibleDiagnosis,
+      diagnosis_code: parsedData.diagnosisCode || "000000",
       extracted_doc_notes: parsedData.extractedDocNotes,
       medications: parsedData.medications || [],
       lab_values: parsedData.labValues || [],
