@@ -414,6 +414,7 @@ export default function ChatPage() {
         updatedHistory,
         step,
         languageName,
+        hasDismissedEmergency.current, // REFINEMENT: Inject the dismissal state
       );
       setIsAiThinking(false);
 
@@ -582,6 +583,7 @@ export default function ChatPage() {
     hasDismissedEmergency.current = true;
     if (currentAudioRef.current) currentAudioRef.current.pause();
     if (window.speechSynthesis) window.speechSynthesis.cancel();
+    // If the pending response was purely an emergency warning, prompt the next step cleanly
     if (pendingAiResponse) {
       proceedWithAiResponse(pendingAiResponse);
       setPendingAiResponse(null);

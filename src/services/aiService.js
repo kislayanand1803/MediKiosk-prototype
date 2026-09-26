@@ -487,6 +487,7 @@ export async function generateNextChatResponse(
   chatHistory,
   step,
   language = "English",
+  hasDismissedEmergency = false, // NEW: Pass the frontend dismissal state to the AI
 ) {
   try {
     const latestPatientMsg =
@@ -494,7 +495,7 @@ export async function generateNextChatResponse(
     const deterministicFindings = deterministicRedFlagCheck(latestPatientMsg);
 
     const historyText = chatHistory
-      .map((m) => `${m.sender === "ai" ? "Doctor" : "Patient"}: ${m.text}`)
+      .map((m) => `\({m.sender === "ai" ? "Doctor" : "Patient"}:\){m.text}`)
       .join("\n");
 
     let clinicalDirective = "";
@@ -524,15 +525,24 @@ CRITICAL SAFETY & ROLE RULES:
 2. NEVER tell the patient to "unlock your front door", "wait for responders to arrive at your home", or that you are "dispatching an ambulance to your location".
 3. The patient is standing or seated right in front of this kiosk in the clinic.`;
 
-    const emergencyDirective = `CRITICAL RED FLAG & SYNCOPE PROTOCOL:
-If the patient reports symptoms indicating an acute medical emergency:
-- You MUST set "critical_symptom_detected" to true IMMEDIATELY.
-- In "question", output a concise, urgent warning directing the patient to alert the hospital staff immediately.
-- DO NOT continue asking conversational routine intake questions.`;
+    // REFINEMENT: Dynamic Emergency Directive based on frontend state
+    const emergencyDirective = hasDismissedEmergency
+      ? `SYSTEM OVERRIDE: The patient has confirmed their severe symptoms are their normal chronic baseline. IGNORE the emergency red-flag protocol. DO NOT tell them to alert staff. Proceed normally with the ${clinicalDirective} phase.`
+      : `CLINICAL PROTOCOL:
+If the patient reports acute red-flag symptoms (e.g., severe sudden headache, acute chest pressure, syncope):
+- Set "critical_symptom_detected" to true.
+- In "question", DO NOT preach or act like an emergency dispatcher. Acknowledge the symptom briefly and proceed directly with the next intake phase (${clinicalDirective}).
+- Provide 3 clinically useful options related to the symptom (e.g., duration, nature of pain, associated triggers).`;
 
-    const langInstruction = `CRITICAL LANGUAGE REQUIREMENT: Output the response JSON entirely in fluent ${language} script and vocabulary.`;
+    // REFINEMENT: Multilingual and Voice phrasing optimization
+    const formatInstruction = `Generate the next response in ${language}. 
+RULES:
+1. Ask ONLY ONE single, short question. Do NOT ask compound questions (e.g., avoid using "and", "or" to string multiple questions together).
+2. Keep the sentence under 15 words for easy text-to-speech comprehension.
+3. Tolerate and understand code-switching (e.g., Hinglish, mixed dialects) in the patient's history, but output your response purely in fluent ${language}.
+4. Provide 3 short, clinically relevant quick-reply options in ${language}.`;
 
-    const prompt = `${kioskContextDirective}\n${clinicalDirective}\n${emergencyDirective}\n${langInstruction}\n\nConversation History:\n${historyText}\n\nGenerate the next response in ${language}. Keep the question under 2 sentences.\nProvide 3 short, clinically relevant quick-reply options in ${language}.`;
+    const prompt = `\({kioskContextDirective}\n\){clinicalDirective}\n\({emergencyDirective}\n\){formatInstruction}\n\nConversation History:\n${historyText}`;
 
     const config = {
       temperature: 0.2,
@@ -551,7 +561,7 @@ If the patient reports symptoms indicating an acute medical emergency:
     const response = await executeWithModelFallback([{ text: prompt }], config);
     const parsed = safeJsonParse(response.text);
 
-    if (deterministicFindings.length > 0) {
+    if (deterministicFindings.length > 0 && !hasDismissedEmergency) {
       parsed.critical_symptom_detected = true;
     }
 
