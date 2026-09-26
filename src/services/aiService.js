@@ -483,66 +483,172 @@ ${languageInstruction}`,
 // =========================================================
 // DYNAMIC CHAT AI ENGINE
 // =========================================================
+
+/**
+ * Phase definitions for the Ayush Prashna Pariksha intake interview.
+ * Each phase has:
+ *   - directive: the one concrete clinical question topic to ask
+ *   - completionCriteria: what the patient must have provided for
+ *     `phase_complete` to be legitimately true. This is injected
+ *     verbatim into the prompt so the model has an unambiguous,
+ *     checkable condition — not a vague "enough information" judgment.
+ *   - minimumExchanges: the fewest patient turns this phase should ever
+ *     take. Used as a hard floor on `phase_complete` — prevents the
+ *     model from marking a phase complete on the very first reply when
+ *     it has no conversation history to evaluate.
+ */
+const INTAKE_PHASE_DEFINITIONS = [
+  null, // index 0 unused — step is 1-indexed
+  {
+    // Step 1
+    name: "Chief Complaint & Body Location",
+    directive:
+      "Ask ONE focused clinical follow-up about the patient's PRIMARY SYMPTOM. Clarify location, onset, severity, or character. Do NOT ask about digestion, sleep, diet, or any other topic.",
+    completionCriteria:
+      "The patient has described WHAT their symptom is AND at least one of: WHERE it is located, WHEN it started, or HOW SEVERE it is.",
+    minimumExchanges: 1,
+  },
+  {
+    // Step 2
+    name: "Digestion & Agni",
+    directive:
+      "Ask ONE targeted question about DIGESTION OR APPETITE ONLY. Examples: bowel habits, appetite changes, acidity, bloating. Do NOT revisit the chief complaint. Do NOT ask about sleep or diet.",
+    completionCriteria:
+      "The patient has commented on their appetite, digestion, or bowel habits in any way.",
+    minimumExchanges: 1,
+  },
+  {
+    // Step 3
+    name: "Sleep & Energy (Nidra)",
+    directive:
+      "Ask ONE targeted question about SLEEP QUALITY OR ENERGY LEVELS ONLY. Examples: difficulty sleeping, fatigue, tiredness. Do NOT ask about digestion or diet.",
+    completionCriteria:
+      "The patient has commented on their sleep pattern or energy level in any way.",
+    minimumExchanges: 1,
+  },
+  {
+    // Step 4
+    name: "Lifestyle & Stress (Vihara)",
+    directive:
+      "Ask ONE targeted question about DAILY ROUTINE OR STRESS LEVELS ONLY. Examples: work hours, physical activity, stress, anxiety. Do NOT ask about diet or food.",
+    completionCriteria:
+      "The patient has commented on their daily routine, work, activity level, or stress in any way.",
+    minimumExchanges: 1,
+  },
+  {
+    // Step 5
+    name: "Dietary Habits (Ahara)",
+    directive:
+      "Ask ONE targeted question about REGULAR DIETARY HABITS ONLY. Examples: spicy food, meal timing, vegetarian or non-vegetarian diet, water intake. Do NOT ask about symptoms or lifestyle.",
+    completionCriteria:
+      "The patient has commented on their eating habits or food preferences in any way.",
+    minimumExchanges: 1,
+  },
+];
+
 export async function generateNextChatResponse(
   chatHistory,
   step,
   language = "English",
-  hasDismissedEmergency = false, // NEW: Pass the frontend dismissal state to the AI
+  hasDismissedEmergency = false,
 ) {
   try {
     const latestPatientMsg =
       [...chatHistory].reverse().find((m) => m.sender === "user")?.text || "";
     const deterministicFindings = deterministicRedFlagCheck(latestPatientMsg);
 
+    /**
+     * FIX 1: Broken template literal (was `\({m.sender}\){m.text}`).
+     * The backslash-paren escaping was corrupting every message in the
+     * history string. The model received literal `\(Doctor:\)text` instead
+     * of "Doctor: text" — making the entire conversation unreadable and
+     * causing the amnesia / script-restart behavior observed in production.
+     */
     const historyText = chatHistory
-      .map((m) => `\({m.sender === "ai" ? "Doctor" : "Patient"}:\){m.text}`)
+      .map((m) => `${m.sender === "ai" ? "Doctor" : "Patient"}: ${m.text}`)
       .join("\n");
 
-    let clinicalDirective = "";
-    switch (step) {
-      case 1:
-        clinicalDirective = `PHASE 1: Chief Complaint. Ask ONE focused clinical follow-up question.`;
-        break;
-      case 2:
-        clinicalDirective = `PHASE 2: Digestion & Agni. Ask ONE targeted question about appetite, digestion.`;
-        break;
-      case 3:
-        clinicalDirective = `PHASE 3: Sleep & Energy. Ask ONE targeted question about sleep quality, fatigue.`;
-        break;
-      case 4:
-        clinicalDirective = `PHASE 4: Lifestyle & Vihara. Ask ONE targeted question about daily routine.`;
-        break;
-      case 5:
-        clinicalDirective = `PHASE 5: Diet & Ahara. Ask ONE targeted question about regular dietary habits.`;
-        break;
-      default:
-        clinicalDirective = `Ask ONE brief summary confirmation question.`;
-    }
+    /**
+     * FIX 2: Phase-locked prompt with unambiguous completion criteria.
+     * Previously the directive was a one-line soft suggestion that the model
+     * could ignore. Now:
+     *   (a) The phase name and what NOT to ask is stated explicitly.
+     *   (b) `completionCriteria` is a concrete, checkable condition — not
+     *       "enough information," which the model interprets as "one exchange."
+     *   (c) `minimumExchanges` prevents `phase_complete: true` on the first
+     *       reply of a fresh phase when the patient hasn't answered yet.
+     */
+    const phase = INTAKE_PHASE_DEFINITIONS[step];
+
+    // Count how many patient turns have occurred at this step by looking
+    // backward from the end of the history until we hit an AI message that
+    // introduced the phase topic. Approximate: count patient turns since the
+    // last AI question (within the last 6 messages, to stay cheap).
+    const recentMessages = chatHistory.slice(-6);
+    const patientTurnsInPhase = recentMessages.filter(
+      (m) => m.sender === "user",
+    ).length;
+
+    const phaseTooNewForCompletion =
+      phase && patientTurnsInPhase < phase.minimumExchanges;
+
+    const clinicalDirective = phase
+      ? `
+=== CURRENT INTAKE PHASE: ${phase.name} (Step ${step} of 5) ===
+YOUR TASK: ${phase.directive}
+
+PHASE COMPLETION RULE:
+Set "phase_complete": true ONLY IF this condition is met:
+  "${phase.completionCriteria}"
+Set "phase_complete": false if the patient has NOT yet satisfied this condition,
+or if you need one more clarification specifically about ${phase.name}.
+${phaseTooNewForCompletion ? `OVERRIDE: The patient has not yet responded to this phase's question. Set "phase_complete": false.` : ""}
+
+ABSOLUTE PROHIBITION: Do NOT ask about topics belonging to other phases.
+Do NOT ask what the patient's primary symptom is — that was captured in Step 1.
+Do NOT restart the intake from the beginning.
+`
+      : `Ask ONE brief summary confirmation question.`;
 
     const kioskContextDirective = `YOU ARE AN AI CLINICAL INTAKE KIOSK LOCATED PHYSICALLY AT A HOSPITAL OPD WAITING COUNTER.
 CRITICAL SAFETY & ROLE RULES:
 1. NEVER act as a remote 911 or 112 ambulance dispatcher.
-2. NEVER tell the patient to "unlock your front door", "wait for responders to arrive at your home", or that you are "dispatching an ambulance to your location".
-3. The patient is standing or seated right in front of this kiosk in the clinic.`;
+2. The patient is standing right in front of this kiosk in the clinic.
 
-    // REFINEMENT: Dynamic Emergency Directive based on frontend state
+CRITICAL CONVERSATIONAL RULE:
+You have FULL conversation history below. Read it carefully before responding.
+The patient's chief complaint and all prior answers are already recorded.
+DO NOT re-ask anything the patient has already answered.
+DO NOT greet the patient again — the greeting already happened at the start.
+DO NOT ask "what is your main symptom" or any opening intake question.`;
+
     const emergencyDirective = hasDismissedEmergency
-      ? `SYSTEM OVERRIDE: The patient has confirmed their severe symptoms are their normal chronic baseline. IGNORE the emergency red-flag protocol. DO NOT tell them to alert staff. Proceed normally with the ${clinicalDirective} phase.`
+      ? `SYSTEM OVERRIDE: The patient confirmed their severe symptoms are a chronic baseline. IGNORE the emergency red-flag protocol. Proceed with the current phase.`
       : `CLINICAL PROTOCOL:
-If the patient reports acute red-flag symptoms (e.g., severe sudden headache, acute chest pressure, syncope):
-- Set "critical_symptom_detected" to true.
-- In "question", DO NOT preach or act like an emergency dispatcher. Acknowledge the symptom briefly and proceed directly with the next intake phase (${clinicalDirective}).
-- Provide 3 clinically useful options related to the symptom (e.g., duration, nature of pain, associated triggers).`;
+If the patient reports ACUTE red-flag symptoms (e.g., severe sudden headache, chest pressure, syncope, uncontrolled bleeding):
+- IMMEDIATELY set "critical_symptom_detected" to true.
+- Do not ask conversational triage questions about the emergency.`;
 
-    // REFINEMENT: Multilingual and Voice phrasing optimization
-    const formatInstruction = `Generate the next response in ${language}. 
-RULES:
-1. Ask ONLY ONE single, short question. Do NOT ask compound questions (e.g., avoid using "and", "or" to string multiple questions together).
-2. Keep the sentence under 15 words for easy text-to-speech comprehension.
-3. Tolerate and understand code-switching (e.g., Hinglish, mixed dialects) in the patient's history, but output your response purely in fluent ${language}.
-4. Provide 3 short, clinically relevant quick-reply options in ${language}.`;
+    const formatInstruction = `Generate the next response in ${language}.
+OUTPUT RULES:
+1. Ask ONLY ONE single, short question under 15 words. No compound questions.
+2. Tolerate code-switching (Hinglish, mixed dialects) from the patient, but output your response purely in fluent ${language}.
+3. Provide exactly 3 short, clinically relevant quick-reply options in ${language}.`;
 
-    const prompt = `\({kioskContextDirective}\n\){clinicalDirective}\n\({emergencyDirective}\n\){formatInstruction}\n\nConversation History:\n${historyText}`;
+    /**
+     * FIX 3: Prompt assembly also had the broken template literal.
+     * The entire prompt was being built with `\({...}\){...}` syntax
+     * which produced literal backslash-paren characters in the string.
+     */
+    const prompt = [
+      kioskContextDirective,
+      clinicalDirective,
+      emergencyDirective,
+      formatInstruction,
+      "",
+      "Conversation History (read this carefully):",
+      historyText,
+    ].join("\n");
 
     const config = {
       temperature: 0.2,
@@ -553,16 +659,31 @@ RULES:
           question: { type: Type.STRING },
           options: { type: Type.ARRAY, items: { type: Type.STRING } },
           critical_symptom_detected: { type: Type.BOOLEAN },
+          phase_complete: { type: Type.BOOLEAN },
         },
-        required: ["question", "options", "critical_symptom_detected"],
+        required: [
+          "question",
+          "options",
+          "critical_symptom_detected",
+          "phase_complete",
+        ],
       },
     };
 
     const response = await executeWithModelFallback([{ text: prompt }], config);
     const parsed = safeJsonParse(response.text);
 
+    // Deterministic override: if our own red-flag scanner fired on the
+    // patient's latest message, force critical_symptom_detected true
+    // regardless of what the model returned.
     if (deterministicFindings.length > 0 && !hasDismissedEmergency) {
       parsed.critical_symptom_detected = true;
+    }
+
+    // Safety floor: never let the model mark a phase complete if the patient
+    // hasn't had at least one turn to actually answer the phase question.
+    if (phaseTooNewForCompletion) {
+      parsed.phase_complete = false;
     }
 
     return parsed;
@@ -573,6 +694,7 @@ RULES:
         "Could you clarify how long you have been experiencing this discomfort?",
       options: ["Few hours", "2-3 days", "Over a week"],
       critical_symptom_detected: false,
+      phase_complete: false,
     };
   }
 }

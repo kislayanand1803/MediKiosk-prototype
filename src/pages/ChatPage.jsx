@@ -82,6 +82,44 @@ const EMERGENCY_TRANSLATIONS = {
   },
 };
 
+/**
+ * These are the user-affirmation phrases that should trigger an immediate
+ * emergency lock WITHOUT a further AI call. When the AI has already asked
+ * "are you having a life-threatening emergency?" and the user clicks "Yes,
+ * I have severe symptoms" or types something matching these patterns, the
+ * next AI turn must never happen — it would allow the model to reset its
+ * own triage script and re-ask the question, which is the exact bug in the
+ * report. Checked deterministically in processMessage before any AI call.
+ */
+const EMERGENCY_AFFIRMATION_PATTERNS = [
+  "yes, i have severe symptoms",
+  "yes, i have an emergency",
+  "yes, it's severe",
+  "yes severe",
+  "yes emergency",
+  "i have an emergency",
+  "yes, this is an emergency",
+  "yes i have severe",
+  "i have severe symptoms",
+  "it is an emergency",
+  "this is an emergency",
+  "मुझे आपातकाल है",
+  "हाँ, यह गंभीर है",
+  "হ্যাঁ, এটা জরুরি",
+  "ਹਾਂ, ਇਹ ਐਮਰਜੈਂਸੀ ਹੈ",
+];
+
+/**
+ * Returns true if the user's message is a direct confirmation of an emergency,
+ * regardless of which language or chip label was used.
+ */
+function isEmergencyAffirmation(text) {
+  const lower = text.toLowerCase().trim();
+  return EMERGENCY_AFFIRMATION_PATTERNS.some((pattern) =>
+    lower.includes(pattern.toLowerCase()),
+  );
+}
+
 const INTAKE_STEPS = [
   "Symptoms & Location",
   "Digestion & Appetite",
@@ -352,14 +390,68 @@ export default function ChatPage() {
     };
   }, []);
 
+  /**
+   * OPENING-SCRIPT RESTART DETECTOR (Fix for bugs 1 & 2)
+   * -------------------------------------------------------
+   * The AI's safety guardrails can override the step directive and output its
+   * opening intake question again ("What are your symptoms today?") even when
+   * the patient is on step 3 (Sleep & Energy). When this happens:
+   *   - `phase_complete` from the AI should be false (bug: sometimes it's true)
+   *   - The stepper should NEVER advance
+   *   - The conversation should not show a duplicate greeting question
+   *
+   * This function detects restart patterns in the AI's response text and treats
+   * them as "step not complete" regardless of what the AI returned for
+   * `phase_complete`. This is a deterministic override — the AI's own judgment
+   * is not trusted when it contradicts the conversation history.
+   */
+  const OPENING_SCRIPT_PATTERNS = [
+    "what is your primary symptom",
+    "what symptoms are you experiencing",
+    "what is the main reason for your visit",
+    "what brings you in today",
+    "what is your main complaint",
+    "could you please describe the main reason",
+    "hello, what is the main symptom",
+    "namaste, what is the main symptom",
+    "नमस्ते",
+    "आज आपको क्या परेशानी",
+    "आज आप क्या लक्षण",
+  ];
+
+  function aiHasRestartedScript(responseText) {
+    if (!responseText) return false;
+    const lower = responseText.toLowerCase();
+    return OPENING_SCRIPT_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
+  }
+
   const proceedWithAiResponse = (aiResponse) => {
-    setMessages((prev) => [
-      ...prev,
-      { text: aiResponse.question, sender: "ai" },
-    ]);
+    const responseText = aiResponse.question || "";
+
+    // If the AI has restarted its opening script, do not add the duplicate
+    // question to the chat and do not advance the step. Instead, silently
+    // retry the same step on the next user message.
+    if (aiHasRestartedScript(responseText) && step > 1) {
+      console.warn(
+        `[ChatPage] AI restarted opening script at step ${step}. Suppressing response and holding step.`,
+      );
+      // Show a neutral "please continue" prompt instead of the AI's restart
+      const holdPrompt = "Please continue sharing your symptoms or concerns.";
+      setMessages((prev) => [...prev, { text: holdPrompt, sender: "ai" }]);
+      setDynamicChips([]);
+      if (isVoiceOn) speakText(holdPrompt);
+      return;
+    }
+
+    setMessages((prev) => [...prev, { text: responseText, sender: "ai" }]);
     setDynamicChips(aiResponse.options || []);
-    setStep((prev) => prev + 1);
-    if (isVoiceOn) speakText(aiResponse.question);
+
+    // Only advance the stepper if the AI explicitly signals the current
+    // clinical phase is satisfied AND it hasn't restarted its script.
+    if (aiResponse.phase_complete && !aiHasRestartedScript(responseText)) {
+      setStep((prev) => prev + 1);
+    }
+    if (isVoiceOn) speakText(responseText);
   };
 
   const processMessage = async (userText) => {
@@ -376,6 +468,10 @@ export default function ChatPage() {
     const lowerText = userText.toLowerCase();
     const immediateRedFlags = deterministicRedFlagCheck(userText);
 
+    // -----------------------------------------------------------------------
+    // TIER 1: IMMEDIATE SOS — physical distress signals (unchanged)
+    // Patient cannot operate the kiosk independently; lock immediately.
+    // -----------------------------------------------------------------------
     const hasImmediateThreat =
       lowerText.includes("faint") ||
       lowerText.includes("wheelchair") ||
@@ -408,13 +504,33 @@ export default function ChatPage() {
       return;
     }
 
+    // -----------------------------------------------------------------------
+    // TIER 2: DETERMINISTIC EMERGENCY AFFIRMATION (FIX for bugs 3 & 5)
+    // The AI previously asked "are you having severe symptoms?", the patient
+    // confirmed via chip or text, and the AI got a second turn — which caused
+    // it to restart its opening triage script instead of locking. By catching
+    // affirmations here, we never give the AI that second turn. The emergency
+    // modal fires directly from user input, not from an AI response.
+    // -----------------------------------------------------------------------
+    if (
+      isEmergencyAffirmation(userText) &&
+      !hasDismissedEmergency.current &&
+      !isEmergencyLocked
+    ) {
+      setPendingAiResponse(null); // No AI response needed — user confirmed directly
+      setShowEmergencyModal(true);
+      setEmergencyTimer(15);
+      if (isVoiceOn) speakText(emText.voice);
+      return; // Do NOT call generateNextChatResponse
+    }
+
     if (step < TOTAL_STEPS - 1) {
       setIsAiThinking(true);
       const aiResponse = await generateNextChatResponse(
         updatedHistory,
         step,
         languageName,
-        hasDismissedEmergency.current, // REFINEMENT: Inject the dismissal state
+        hasDismissedEmergency.current,
       );
       setIsAiThinking(false);
 
@@ -1056,11 +1172,42 @@ export default function ChatPage() {
               )}
             </div>
 
-            <div
-              className={`bg-white p-4 rounded-3xl border shadow-sm flex items-center justify-center min-h-[400px] transition-all duration-500 ${step > 1 ? "border-emerald-200 bg-emerald-50/20 pointer-events-none" : "border-slate-200"}`}
-            >
-              <BodyMapSelector onSelect={processMessage} />
-            </div>
+            {/*
+              FIX for Bug 4: The body map previously remained interactive and
+              showed a live "Confirm Selection (1)" button even after the patient
+              had already submitted their complaint in step 1. This had two
+              problems:
+                (a) It gave the illusion of an active selector when tapping it
+                    did nothing useful mid-consultation.
+                (b) It occupied the full sidebar panel throughout the session,
+                    blocking the "Live Triage Notes" section from being visible
+                    at meaningful sizes.
+              Fix: The BodyMapSelector container is now `pointer-events-none`
+              AND visually collapsed to a compact read-only badge from step 2
+              onward. The live triage notes section (already in the original
+              code) gets the full sidebar space it deserves from step 2 onwards.
+            */}
+            {step === 1 ? (
+              <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex items-center justify-center min-h-[400px]">
+                <BodyMapSelector onSelect={processMessage} />
+              </div>
+            ) : (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
+                <CheckCircle
+                  size={20}
+                  className="text-emerald-600 flex-shrink-0"
+                />
+                <div>
+                  <p className="text-xs font-bold text-emerald-800">
+                    Body location captured
+                  </p>
+                  <p className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed">
+                    The AI is now building a clinical picture from your reported
+                    symptoms. No further input needed here.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {step === 1 && (
               <div className="mt-8">
@@ -1109,6 +1256,31 @@ export default function ChatPage() {
                     <p className="text-xs text-slate-600 leading-relaxed">
                       {t("liveNote2")}
                     </p>
+                  </div>
+
+                  {/* Live step progress shown in the sidebar from step 2 —
+                      helps staff and patients see exactly which clinical phase
+                      the interview is currently on without staring at the
+                      stepper header. */}
+                  <div className="pt-3 border-t border-slate-100">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                      Current Phase
+                    </p>
+                    <p className="text-xs font-bold text-[#1d6b54]">
+                      {
+                        INTAKE_STEPS[
+                          Math.min(step - 1, INTAKE_STEPS.length - 1)
+                        ]
+                      }
+                    </p>
+                    <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5">
+                      <div
+                        className="bg-[#1d6b54] h-1.5 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(((step - 1) / (INTAKE_STEPS.length - 1)) * 100, 100)}%`,
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </motion.div>
