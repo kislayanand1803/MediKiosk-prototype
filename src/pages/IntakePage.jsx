@@ -104,7 +104,7 @@ export default function IntakePage() {
     setName("Prachi Sharma");
     setAge("20");
     setGender("Female");
-    setAbhaId("[ABHA ID Redacted]");
+    setAbhaId("91-4582-1923-8821");
     setHasConsent(true);
   };
 
