@@ -318,14 +318,82 @@ export default function DoctorDashboard() {
   };
 
   const handleApproveAndGenerateRx = async () => {
+    // 1. Ensure the doctor actually prescribed something
+    const prescribedItems = Array.isArray(queue.prescription)
+      ? queue.prescription
+      : [];
+
+    if (prescribedItems.length === 0) {
+      alert("Please add at least one medication to the prescription.");
+      return;
+    }
+
+    // 2. Mark patient as approved in the standard queue
     const success = await queue.handleApprove();
-    if (success) {
-      // STRICT FIX: Pass empty object if profile is null to prevent PDF crash
+    if (!success) return;
+
+    try {
+      // 3. Create the parent prescription record
+      const { data: rxData, error: rxError } = await supabase
+        .from("prescriptions")
+        .insert({
+          encounter_id: queue.selectedPatient.id, // Using patient ID as encounter ID for MVP
+          patient_id: queue.selectedPatient.id,
+          doctor_id: profile?.id || "00000000-0000-0000-0000-000000000000", // Fallback if profile is loading
+          status: "ISSUED",
+        })
+        .select()
+        .single();
+
+      if (rxError) throw rxError;
+
+      // 4. Bulk insert the individual medication items
+      const itemsToInsert = prescribedItems.map((item) => ({
+        prescription_id: rxData.id,
+        medication_id: item.medication_id,
+        dosage: item.dosage,
+        frequency: item.frequency,
+        duration_days: item.duration_days,
+        quantity_to_dispense: item.quantity_to_dispense,
+      }));
+
+      const { error: itemsError } = await supabase
+        .from("prescription_items")
+        .insert(itemsToInsert);
+
+      if (itemsError) throw itemsError;
+
+      // 5. Calculate totals and generate the digital invoice
+      const medicationTotal = prescribedItems.reduce(
+        (sum, item) =>
+          sum + Number(item.unit_price) * Number(item.quantity_to_dispense),
+        0,
+      );
+
+      const taxAmount = medicationTotal * 0.05; // 5% GST on Ayush Medicines
+      const grandTotal = medicationTotal + taxAmount;
+
+      const { error: invoiceError } = await supabase
+        .from("billing_invoices")
+        .insert({
+          prescription_id: rxData.id,
+          medication_total: medicationTotal,
+          tax_amount: taxAmount,
+          grand_total: grandTotal,
+          payment_status: "PENDING",
+        });
+
+      if (invoiceError) throw invoiceError;
+
+      // 6. Generate the final e-Prescription PDF with the structured items
       generateEPrescription(
         queue.selectedPatient,
-        queue.prescription,
+        prescribedItems,
         profile || {},
       );
+    } catch (error) {
+      console.error("Failed to generate database prescription records:", error);
+      alert("Error saving prescription to database. Check console logs.");
     }
   };
 

@@ -1,6 +1,7 @@
 import { Stethoscope } from "lucide-react";
 import PatientQueueList from "./PatientQueueList";
 import PatientDetailPanel from "./PatientDetailPanel";
+import MedicationPrescriber from "./MedicationPrescriber";
 
 /**
  * ============================================================================
@@ -65,22 +66,27 @@ export default function QueueTab({
           </p>
         </div>
       ) : (
-        <PatientDetailPanel
-          patient={selectedPatient}
-          caseNotes={caseNotes}
-          prescription={prescription}
-          onChangeCaseNotes={onChangeCaseNotes}
-          onChangePrescription={onChangePrescription}
-          isEditing={isEditing}
-          onToggleEdit={onToggleEdit}
-          onApprove={onApprove}
-          onDownloadReport={onDownloadReport}
-          onOpenFhirModal={onOpenFhirModal}
-          onOpenDocViewer={onOpenDocViewer}
-          isDarkMode={isDarkMode}
-          formatTime={formatTime}
-          getElapsedConsultationTime={getElapsedConsultationTime}
-        />
+        <>
+          <PatientDetailPanel
+            patient={selectedPatient}
+            caseNotes={caseNotes}
+            prescription={prescription}
+            onChangeCaseNotes={onChangeCaseNotes}
+            onChangePrescription={onChangePrescription}
+            isEditing={isEditing}
+            onToggleEdit={onToggleEdit}
+            onApprove={onApprove}
+            onDownloadReport={onDownloadReport}
+            onOpenFhirModal={onOpenFhirModal}
+            onOpenDocViewer={onOpenDocViewer}
+            isDarkMode={isDarkMode}
+            formatTime={formatTime}
+            getElapsedConsultationTime={getElapsedConsultationTime}
+          />
+
+          {/* Replace the old free-text textarea with this */}
+          <MedicationPrescriber onUpdateItems={onChangePrescription} />
+        </>
       )}
     </div>
   );
