@@ -33,11 +33,13 @@ export default function QueueTab({
   getDynamicWaitTime,
   getElapsedConsultationTime,
 }) {
-  // Only patients who are still awaiting/undergoing consultation belong in
-  // the active doctor queue. Approved/completed cases remain in history.
+  // Patients with status "Pending", "In Consult", "Approved", or "Completed" are considered part of the active queue.
   const activeQueuePatients = (Array.isArray(patients) ? patients : []).filter(
     (patient) =>
-      patient?.status === "Pending" || patient?.status === "In Consult",
+      patient?.status === "Pending" ||
+      patient?.status === "In Consult" ||
+      patient?.status === "Approved" ||
+      patient?.status === "Completed",
   );
 
   return (
