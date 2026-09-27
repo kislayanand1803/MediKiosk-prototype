@@ -33,13 +33,15 @@ export default function QueueTab({
   getDynamicWaitTime,
   getElapsedConsultationTime,
 }) {
-  // Patients with status "Pending", "In Consult", "Approved", or "Completed" are considered part of the active queue.
+  // Patients with status "Pending", "In Consult", "Approved", "Completed", or "Dispensed" are considered active in the queue.
   const activeQueuePatients = (Array.isArray(patients) ? patients : []).filter(
     (patient) =>
       patient?.status === "Pending" ||
+      patient?.status === "Waiting" ||
       patient?.status === "In Consult" ||
       patient?.status === "Approved" ||
-      patient?.status === "Completed",
+      patient?.status === "Completed" ||
+      patient?.status === "Dispensed",
   );
 
   return (

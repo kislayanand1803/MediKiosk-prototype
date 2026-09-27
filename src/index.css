@@ -7,30 +7,52 @@
  * Browsers ship with a default 8px margin on <body> and box-sizing
  * set to content-box — both cause unwanted edge gaps and sizing
  * surprises once padding/borders are added. Reset them once here
- * instead of fighting them per-component.
+ * instead of fighting them per-component.[cite: 1]
  */
 * {
-  box-sizing: border-box;
+  box-sizing: border-box; /*[cite: 1] */
 }
 
 html,
 body {
-  margin: 0;
-  padding: 0;
+  margin: 0; /*[cite: 1] */
+  padding: 0; /*[cite: 1] */
 }
 
 /*
  * #root is the mount point Vite/React renders into (see main.jsx).
  * It needs an explicit width and a minimum height, or it only takes
  * up as much space as its content — which is what was leaving the
- * page looking narrower than the viewport.
+ * page looking narrower than the viewport.[cite: 1]
  */
 #root {
-  width: 100%;
-  /* dvh (not vh) so this matches the h-[100dvh] shell used by full-screen pages like ChatPage.jsx and DoctorDashboard.jsx. vh and dvh can differ on mobile by the height of the browser's collapsible address bar — when #root (via vh) ends up taller than a page's own dvh-sized container, that leftover sliver makes the ENTIRE page scrollable at the browser level, on top of the page's own internal scroll region. That's what was dragging ChatPage's sticky header out of view: two independent scroll regions layered on top of each other. */
-  min-height: 100dvh;
+  width: 100%; /*[cite: 1] */
+  /* dvh (not vh) so this matches the h-[100dvh] shell used by full-screen pages like ChatPage.jsx and DoctorDashboard.jsx. vh and dvh can differ on mobile by the height of the browser's collapsible address bar — when #root (via vh) ends up taller than a page's own dvh-sized container, that leftover sliver makes the ENTIRE page scrollable at the browser level, on top of the page's own internal scroll region. That's what was dragging ChatPage's sticky header out of view: two independent scroll regions layered on top of each other.[cite: 1] */
+  min-height: 100dvh; /*[cite: 1] */
 }
 
 body {
-  background-color: #f8fafc;
+  background-color: #f8fafc; /*[cite: 1] */
+}
+
+/* 
+ * Print Isolation Rules for InvoiceReceipt.jsx
+ * Forces the main dashboard to hide during window.print() so only 
+ * the receipt container is rendered to the physical page. 
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .receipt-container,
+  .receipt-container * {
+    visibility: visible;
+  }
+
+  .receipt-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
 }
