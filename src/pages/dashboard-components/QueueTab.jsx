@@ -1,7 +1,6 @@
 import { Stethoscope } from "lucide-react";
 import PatientQueueList from "./PatientQueueList";
 import PatientDetailPanel from "./PatientDetailPanel";
-import MedicationPrescriber from "./MedicationPrescriber";
 
 /**
  * ============================================================================
@@ -13,7 +12,7 @@ export default function QueueTab({
   selectedPatient,
   isEditing,
   caseNotes,
-  prescription, // NEW: Inherit state
+  prescription,
   selectedDate,
   queueFilter,
   searchQuery,
@@ -24,7 +23,7 @@ export default function QueueTab({
   onSelectPatient,
   onCallNextPatient,
   onChangeCaseNotes,
-  onChangePrescription, // NEW: Inherit setter
+  onChangePrescription,
   onToggleEdit,
   onApprove,
   onDownloadReport,
@@ -34,10 +33,17 @@ export default function QueueTab({
   getDynamicWaitTime,
   getElapsedConsultationTime,
 }) {
+  // Only patients who are still awaiting/undergoing consultation belong in
+  // the active doctor queue. Approved/completed cases remain in history.
+  const activeQueuePatients = (Array.isArray(patients) ? patients : []).filter(
+    (patient) =>
+      patient?.status === "Pending" || patient?.status === "In Consult",
+  );
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 overflow-hidden">
       <PatientQueueList
-        patients={patients}
+        patients={activeQueuePatients}
         selectedPatient={selectedPatient}
         selectedDate={selectedDate}
         onChangeDate={onChangeDate}
@@ -66,27 +72,22 @@ export default function QueueTab({
           </p>
         </div>
       ) : (
-        <>
-          <PatientDetailPanel
-            patient={selectedPatient}
-            caseNotes={caseNotes}
-            prescription={prescription}
-            onChangeCaseNotes={onChangeCaseNotes}
-            onChangePrescription={onChangePrescription}
-            isEditing={isEditing}
-            onToggleEdit={onToggleEdit}
-            onApprove={onApprove}
-            onDownloadReport={onDownloadReport}
-            onOpenFhirModal={onOpenFhirModal}
-            onOpenDocViewer={onOpenDocViewer}
-            isDarkMode={isDarkMode}
-            formatTime={formatTime}
-            getElapsedConsultationTime={getElapsedConsultationTime}
-          />
-
-          {/* Replace the old free-text textarea with this */}
-          <MedicationPrescriber onUpdateItems={onChangePrescription} />
-        </>
+        <PatientDetailPanel
+          patient={selectedPatient}
+          caseNotes={caseNotes}
+          prescription={prescription}
+          onChangeCaseNotes={onChangeCaseNotes}
+          onChangePrescription={onChangePrescription}
+          isEditing={isEditing}
+          onToggleEdit={onToggleEdit}
+          onApprove={onApprove}
+          onDownloadReport={onDownloadReport}
+          onOpenFhirModal={onOpenFhirModal}
+          onOpenDocViewer={onOpenDocViewer}
+          isDarkMode={isDarkMode}
+          formatTime={formatTime}
+          getElapsedConsultationTime={getElapsedConsultationTime}
+        />
       )}
     </div>
   );

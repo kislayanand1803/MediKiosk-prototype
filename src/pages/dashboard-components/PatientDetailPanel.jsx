@@ -27,6 +27,7 @@ import {
 import { DOSHA_INFO } from "../dashboard-data/doshaInfo";
 import { PATIENT_STATUS } from "../dashboard-data/patientStatus";
 import ClinicalTimeline from "../../components/ClinicalTimeline";
+import MedicationPrescriber from "./MedicationPrescriber";
 
 /**
  * ============================================================================
@@ -52,6 +53,13 @@ export default function PatientDetailPanel({
   formatTime,
   getElapsedConsultationTime,
 }) {
+  const isApproved = patient.status === PATIENT_STATUS.APPROVED;
+  const medicationItems = Array.isArray(prescription)
+    ? prescription
+    : Array.isArray(patient.medications)
+      ? patient.medications
+      : [];
+
   return (
     <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-800 p-4 sm:p-6 h-full overflow-y-auto space-y-6 relative transition-colors duration-200">
       {patient.is_red_flag && (
@@ -129,6 +137,7 @@ export default function PatientDetailPanel({
           <button
             type="button"
             onClick={onToggleEdit}
+            disabled={isApproved}
             className={`flex items-center justify-center gap-1.5 text-xs px-3.5 py-2 rounded-lg font-bold transition ${
               isEditing
                 ? "bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300"
@@ -409,9 +418,10 @@ export default function PatientDetailPanel({
         </div>
       </div>
 
-      {/* ============================================================================ */}
-      {/* NEW: DIGITAL E-PRESCRIPTION PAD                                              */}
-      {/* ============================================================================ */}
+      {/* ============================================================================
+           DIGITAL E-PRESCRIPTION
+           The prescriber is anchored to this patient's record and locked after approval.
+      ============================================================================ */}
       <div className="mt-8 bg-indigo-50/40 dark:bg-indigo-900/10 p-5 rounded-xl border border-indigo-200 dark:border-indigo-900/30">
         <h4 className="text-sm font-black uppercase text-indigo-800 dark:text-indigo-400 mb-3 flex items-center gap-2">
           <span
@@ -422,26 +432,85 @@ export default function PatientDetailPanel({
           </span>
           Digital E-Prescription
         </h4>
-        <textarea
-          className="w-full p-4 text-sm text-gray-800 dark:text-white bg-white dark:bg-slate-950 border border-indigo-200 dark:border-indigo-800 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner resize-y min-h-[120px]"
-          placeholder="Type prescribed medications, dosages, and Ayush lifestyle advice here..."
-          value={prescription || ""}
-          onChange={(e) => onChangePrescription(e.target.value)}
-          disabled={patient.status === PATIENT_STATUS.APPROVED}
-        />
+
+        {!isApproved && (
+          <div className="mb-4">
+            <MedicationPrescriber onUpdateItems={onChangePrescription} />
+          </div>
+        )}
+
+        <div className="bg-white dark:bg-slate-950 border border-indigo-200 dark:border-indigo-800 rounded-xl p-4 shadow-inner">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="text-xs font-black uppercase tracking-wide text-slate-600 dark:text-slate-300">
+              Prescribed Medications
+            </p>
+            {isApproved && (
+              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                Read-only • Approved
+              </span>
+            )}
+          </div>
+
+          {medicationItems.length > 0 ? (
+            <div className="space-y-2">
+              {medicationItems.map((item, index) => {
+                const medication =
+                  typeof item === "string" ? { item_name: item } : item || {};
+
+                return (
+                  <div
+                    key={medication.id || medication.item_id || index}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900"
+                  >
+                    <div>
+                      <p className="text-sm font-bold text-slate-900 dark:text-white">
+                        {medication.item_name ||
+                          medication.name ||
+                          medication.drug_name ||
+                          "Unnamed Medication"}
+                      </p>
+                      {medication.namaste_code && (
+                        <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                          {medication.namaste_code}
+                        </p>
+                      )}
+                    </div>
+
+                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      {medication.dosage || "As directed"}
+                      {medication.frequency ? ` • ${medication.frequency}` : ""}
+                      {medication.duration_days != null
+                        ? ` • ${medication.duration_days} ${
+                            medication.duration_days === 1 ? "Day" : "Days"
+                          }`
+                        : ""}
+                      {medication.quantity_to_dispense != null
+                        ? ` • ${medication.quantity_to_dispense} Units`
+                        : ""}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-4 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg">
+              No medications prescribed
+            </div>
+          )}
+        </div>
 
         <div className="mt-4">
           <button
             type="button"
             onClick={onApprove}
-            disabled={patient.status === PATIENT_STATUS.APPROVED}
+            disabled={isApproved}
             className={`w-full flex items-center justify-center gap-2 py-4 rounded-xl font-black text-sm text-white shadow-lg transition-all ${
-              patient.status === PATIENT_STATUS.APPROVED
+              isApproved
                 ? "bg-green-600 dark:bg-green-700 cursor-not-allowed"
                 : "bg-indigo-600 hover:bg-indigo-700 hover:-translate-y-0.5 active:scale-95 shadow-indigo-600/30 hover:shadow-indigo-600/40"
             }`}
           >
-            {patient.status === PATIENT_STATUS.APPROVED ? (
+            {isApproved ? (
               <>
                 <Check size={18} aria-hidden="true" /> eRx Generated & Case
                 Approved
