@@ -120,14 +120,14 @@ export const TECH_STACK = [
     tone: "orange",
     title: "Supabase (PostgreSQL)",
     description:
-      "Secure, cloud-hosted patient database providing real-time synchronization to the Doctor Portal with Row Level Security (RLS).",
+      "Secure, cloud-hosted patient database providing real-time synchronization across the Doctor Portal and Pharmacy Inventory with Row Level Security (RLS).",
   },
   {
     icon: Globe,
     tone: "green",
     title: "Vite + React",
     description:
-      "Lightweight Single Page Application (SPA) architecture utilizing native Web Speech APIs with custom script-family phonetic fallbacks.",
+      "Lightweight Single Page Application (SPA) built with Tailwind CSS, utilizing native Web Speech APIs with custom script-family phonetic fallbacks.",
   },
   {
     icon: Server,

@@ -1,28 +1,26 @@
 import { TECH_STACK } from "../data/landingContent";
 
-// Per-tone classes for the icon chip and hover treatment on each tech card.
-// Kept as a lookup (not built from a template string) so Tailwind's
-// build-time scanner can see every class literally and won't purge it.
+// Updated TONE_CLASSES to include tinted drop shadows and smoother background transitions
 const TONE_CLASSES = {
   blue: {
-    chip: "bg-blue-100",
-    icon: "text-blue-600",
-    hover: "hover:border-blue-300 hover:bg-blue-50/30",
+    chip: "bg-blue-100 text-blue-600",
+    hover:
+      "hover:border-blue-200 hover:bg-blue-50/80 hover:shadow-lg hover:shadow-blue-100/50",
   },
   orange: {
-    chip: "bg-orange-100",
-    icon: "text-orange-600",
-    hover: "hover:border-orange-300 hover:bg-orange-50/30",
+    chip: "bg-orange-100 text-orange-600",
+    hover:
+      "hover:border-orange-200 hover:bg-orange-50/80 hover:shadow-lg hover:shadow-orange-100/50",
   },
   green: {
-    chip: "bg-green-100",
-    icon: "text-green-600",
-    hover: "hover:border-green-300 hover:bg-green-50/30",
+    chip: "bg-green-100 text-green-600",
+    hover:
+      "hover:border-green-200 hover:bg-green-50/80 hover:shadow-lg hover:shadow-green-100/50",
   },
   purple: {
-    chip: "bg-purple-100",
-    icon: "text-purple-600",
-    hover: "hover:border-purple-300 hover:bg-purple-50/30",
+    chip: "bg-purple-100 text-purple-600",
+    hover:
+      "hover:border-purple-200 hover:bg-purple-50/80 hover:shadow-lg hover:shadow-purple-100/50",
   },
 };
 
@@ -31,27 +29,22 @@ function TechCard({ icon: Icon, tone, title, description }) {
 
   return (
     <div
-      className={`border border-gray-100 rounded-3xl p-8 bg-gray-50 transition-colors ${toneClasses.hover}`}
+      className={`group relative border border-gray-100 rounded-3xl p-8 bg-gray-50 hover:-translate-y-1.5 transition-all duration-300 ${toneClasses.hover}`}
     >
       <div
-        className={`${toneClasses.chip} w-12 h-12 rounded-xl flex items-center justify-center mb-6`}
+        className={`${toneClasses.chip} w-14 h-14 rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform duration-300`}
       >
-        <Icon className={toneClasses.icon} aria-hidden="true" />
+        <Icon size={24} aria-hidden="true" />
       </div>
       <h4 className="text-xl font-bold text-gray-900 mb-3">{title}</h4>
-      <p className="text-gray-600 text-sm">{description}</p>
+      <p className="text-gray-600 text-sm leading-relaxed">{description}</p>
     </div>
   );
 }
 
-/**
- * Architecture / tech-stack showcase. Cards are generated from
- * TECH_STACK so the stack story can be updated (e.g. swapping
- * Supabase for another provider) without touching this layout.
- */
 export default function TechStack() {
   return (
-    <section className="py-20 bg-white">
+    <section className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-sm font-bold text-gray-400 tracking-widest uppercase mb-2">
@@ -60,7 +53,7 @@ export default function TechStack() {
           <h3 className="text-3xl font-extrabold text-gray-900">
             Highly Scalable, Hardware-Agnostic Tech
           </h3>
-          <p className="mt-4 text-gray-600 max-w-2xl mx-auto">
+          <p className="mt-4 text-gray-600 max-w-2xl mx-auto text-lg">
             Unlike local LLMs that require expensive GPUs in every clinic,
             MediKiosk uses a modern cloud architecture designed for mass
             deployment in resource-constrained public hospitals and Ayush
