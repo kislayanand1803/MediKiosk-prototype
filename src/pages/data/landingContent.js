@@ -10,25 +10,25 @@ import {
   Ticket,
   Stethoscope,
   Server,
+  Pill, // Added Pill icon for the new pharmacy step
 } from "lucide-react";
 
 /**
  * ==========================================
- * LANDING PAGE CONTENT
+ * LANDING PAGE CONTENT DICTIONARY
  * ==========================================
- * All copy and structured data for the marketing page lives here,
- * separate from the components that render it. This is the single
- * place to edit when wording, stats, or the workflow steps change —
- * no need to touch JSX/layout code for a content update.
+ * Centralized content configuration for the MVP landing page.
+ * Keeping copy and structural data separate from JSX components ensures
+ * rapid iteration during hackathon presentations without touching layout logic.
  */
 
-// Top navigation entry points.
+// Top navigation routing.
 export const NAV_LINKS = [
   { label: "Vaidya Portal", path: "/doctor", variant: "text" },
   { label: "Patient Kiosk", path: "/intake", variant: "solid" },
 ];
 
-// Headline stats shown in the highlight strip below the hero.
+// High-impact performance and compliance metrics displayed below the hero section.
 export const METRICS = [
   { icon: Languages, value: "22", label: "Scheduled Languages" },
   { icon: Clock, value: "< 90s", label: "Avg. Triage Time" },
@@ -40,25 +40,15 @@ export const METRICS = [
   { icon: Cloud, value: "Zero", label: "Local GPUs Needed" },
 ];
 
-// Static preview of the patient-facing triage chat, shown in the hero mockup.
-// Kept as data (rather than hardcoded JSX) so the demo script is easy to update.
-export const HERO_CHAT = [
-  {
-    from: "ai",
-    text: "नमस्ते। मैं आपका आयुष क्लिनिकल एआई सहायक हूँ। आज आपको क्या परेशानी महसूस हो रही है?",
-  },
-  {
-    from: "patient",
-    text: "मुझे दो दिन से बहुत तेज सिरदर्द है और पेट में जलन हो रही है।",
-  },
-  {
-    from: "ai",
-    text: "क्या आपको खाने के बाद पेट में भारीपन या एसिडिटी महसूस होती है?",
-  },
-];
+// Note: HERO_CHAT has been removed from this static dictionary as the
+// conversation is now handled dynamically within Hero.jsx for real-time animation.
 
-// The 6-step "Patient Journey" timeline. `tone` colors the step's icon;
-// `highlight` marks the final, physician-facing step for the orange treatment.
+/**
+ * The 7-step "Patient Journey" timeline.
+ * `tone` dictates the icon's color palette.
+ * `highlight` (applied to the final step) triggers a distinct UI treatment
+ * to signify the conclusion of the workflow (the pharmacy hand-off).
+ */
 export const TIMELINE_STEPS = [
   {
     icon: Languages,
@@ -101,11 +91,22 @@ export const TIMELINE_STEPS = [
     title: "Sequential Consultation",
     description:
       "The physician calls the patients in order of their sequence to ensure fair treatment, reviewing the structured AI summary before the patient even enters.",
-    highlight: true,
+    // Highlight removed here as the journey now continues to the pharmacy
+  },
+  {
+    icon: Pill,
+    tone: "orange",
+    title: "Smart Dispensary & POS",
+    description:
+      "The Vaidya issues an e-prescription mapped to standard NAMASTE codes. The patient proceeds to the pharmacy, where real-time inventory filters and an integrated POS generate an instant receipt with automated Ayush GST calculations.",
+    highlight: true, // This now receives the orange UI treatment
   },
 ];
 
-// Architecture / tech-stack cards.
+/**
+ * Technical architecture cards highlighting the stack's viability,
+ * scalability, and government alignment.
+ */
 export const TECH_STACK = [
   {
     icon: BrainCircuit,
@@ -130,7 +131,7 @@ export const TECH_STACK = [
   },
   {
     icon: Server,
-    tone: "purple", 
+    tone: "purple",
     title: "Node.js ABDM Proxy",
     description:
       "Standalone Express server bridging the frontend to the National Health Authority (NHA) gateway. Handles secure ABHA OTP handshakes and HL7 FHIR R4 data packaging.",
