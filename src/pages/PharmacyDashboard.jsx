@@ -16,22 +16,15 @@ import {
   Loader2,
   XCircle,
   ClipboardList,
+  Search,
+  Filter,
 } from "lucide-react";
 
 import { useDoctorSession } from "./dashboard-hooks/useDoctorSession";
 import { useDarkMode } from "./dashboard-hooks/useDarkMode";
 import LoginScreen from "./dashboard-components/LoginScreen";
-import InvoiceReceipt from "../components/InvoiceReceipt"; // Added Import for POS Receipt
+import InvoiceReceipt from "../components/InvoiceReceipt";
 
-/**
- * ============================================================================
- * PHARMACY DISPENSARY DASHBOARD (Phase 3 POS Integration)
- * ============================================================================
- * Replaces the patients-table-based PharmacyDashboard.jsx with a full
- * billing-and-inventory-aware dispensing workflow backed by the new schema.
- *
- * Includes the Phase 3 POS receipt generation overlay.
- */
 export default function PharmacyDashboard() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoadingSession, logout, profile } =
@@ -60,6 +53,10 @@ export default function PharmacyDashboard() {
   // Inventory tab state
   const [inventory, setInventory] = useState([]);
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+
+  // NEW Inventory Search & Filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
 
   // ------------------------------------------------------------------
   // DATA FETCHING: Pending Queue & Inventory
@@ -194,7 +191,6 @@ export default function PharmacyDashboard() {
       return;
     }
 
-    // Phase 3: Construct POS Receipt Data instead of immediately clearing UI
     const receiptItems = rxLineItems.map((item) => ({
       name: item.pharmacy_inventory?.item_name || "Unknown Item",
       quantity: item.quantity_to_dispense,
@@ -205,7 +201,7 @@ export default function PharmacyDashboard() {
 
     const subtotal = receiptItems.reduce((sum, item) => sum + item.price, 0);
     const total =
-      selectedRx.billing_invoices?.[0]?.grand_total ?? subtotal * 1.05; // 5% GST fallback
+      selectedRx.billing_invoices?.[0]?.grand_total ?? subtotal * 1.05;
     const gst = total - subtotal;
 
     setCompletedTransaction({
@@ -223,10 +219,6 @@ export default function PharmacyDashboard() {
     });
   };
 
-  /**
-   * Executed when the POS Receipt overlay is closed.
-   * Handles the original queue cleanup and UI reset.
-   */
   const handleCloseReceipt = () => {
     const rxIdToClear = selectedRx?.id;
     setCompletedTransaction(null);
@@ -238,7 +230,7 @@ export default function PharmacyDashboard() {
       text: "Dispensed & logged successfully. Inventory updated.",
     });
 
-    fetchInventory(); // Refresh stock in background
+    fetchInventory();
     setTimeout(() => setDispenseMessage({ type: "", text: "" }), 4000);
   };
 
@@ -265,6 +257,16 @@ export default function PharmacyDashboard() {
   }, 0);
   const invoiceTotal =
     selectedRx?.billing_invoices?.[0]?.grand_total ?? lineTotal * 1.05;
+
+  // Filter Logic for Inventory Tab
+  const filteredInventory = inventory.filter((item) => {
+    const matchesSearch =
+      item.item_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.namaste_code?.toLowerCase().includes(searchQuery.toLowerCase());
+    const isLowStock = item.stock_quantity <= item.low_stock_threshold;
+    const matchesStock = showLowStockOnly ? isLowStock : true;
+    return matchesSearch && matchesStock;
+  });
 
   return (
     <div className="h-screen w-full overflow-hidden bg-gray-100 dark:bg-slate-950 p-3 sm:p-4 md:p-6 transition-colors duration-200 flex flex-col">
@@ -648,8 +650,8 @@ export default function PharmacyDashboard() {
         {/* ---- TAB: INVENTORY ---- */}
         {activeTab === "inventory" && (
           <div className="flex-1 overflow-hidden bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 flex flex-col">
-            <div className="p-4 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-              <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-sm">
+            <div className="p-4 border-b border-gray-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50 dark:bg-slate-800/50 gap-4">
+              <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-sm whitespace-nowrap">
                 <Package
                   size={16}
                   className="text-blue-500"
@@ -657,19 +659,46 @@ export default function PharmacyDashboard() {
                 />{" "}
                 Pharmacy Inventory
               </h2>
-              <span className="text-xs text-gray-500 dark:text-slate-400">
-                Rows highlighted in amber have stock below threshold.
-              </span>
+
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <Search
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500"
+                    size={16}
+                    aria-hidden="true"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Search name or NAMASTE code..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <button
+                  onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+                  className={`w-full sm:w-auto flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-bold border rounded-lg transition-colors ${
+                    showLowStockOnly
+                      ? "bg-amber-100 border-amber-300 text-amber-800 dark:bg-amber-900/40 dark:border-amber-700 dark:text-amber-400 shadow-inner"
+                      : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                  }`}
+                >
+                  <Filter size={14} aria-hidden="true" />
+                  {showLowStockOnly ? "Low Stock Only" : "View Low Stock"}
+                </button>
+              </div>
             </div>
+
             <div className="flex-1 overflow-auto">
               {isLoadingInventory ? (
                 <div className="flex items-center justify-center p-12 gap-2 text-slate-400">
                   <Loader2 size={20} className="animate-spin" />{" "}
                   <span className="text-sm">Loading inventory...</span>
                 </div>
-              ) : inventory.length === 0 ? (
+              ) : filteredInventory.length === 0 ? (
                 <div className="text-center p-12 text-sm text-gray-500 dark:text-slate-400">
-                  No active inventory items found.
+                  No inventory items match your search or filter criteria.
                 </div>
               ) : (
                 <table className="w-full text-sm border-collapse">
@@ -692,7 +721,7 @@ export default function PharmacyDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {inventory.map((item) => {
+                    {filteredInventory.map((item) => {
                       const isLow =
                         item.stock_quantity <= item.low_stock_threshold;
                       return (
