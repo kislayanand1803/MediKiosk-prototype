@@ -10,12 +10,20 @@ import {
   Code2,
   Globe,
   MessageSquare,
+  BookOpen,
 } from "lucide-react";
 
 /**
- * Enterprise-grade "Fat Footer" for the landing page.
- * Includes branding, quick navigation, legal links, and social integrations
- * to demonstrate a production-ready product structure to hackathon judges.
+ * ============================================================================
+ * FOOTER COMPONENT
+ * ============================================================================
+ * Enterprise-grade "Fat Footer" for the MediKiosk landing page.
+ *
+ * Features:
+ * - Brand identity and Smart India Hackathon badge.
+ * - Quick navigation shortcuts to internal prototypes and documentation.
+ * - Regulatory compliance links (DPDP Act, ABDM, and NLEAM).
+ * - Government attribution for the Ministry of Ayush and smooth scroll-to-top.
  */
 export default function Footer() {
   const navigate = useNavigate();
@@ -27,11 +35,11 @@ export default function Footer() {
 
   return (
     <footer className="bg-slate-950 text-slate-400 pt-16 pb-10 border-t-4 border-green-600 font-sans">
-      {/* Expanded max-width to eliminate awkward side margins on large screens */}
+      {/* Expanded max-width wrapper to eliminate awkward side margins on large screens */}
       <div className="max-w-[90rem] mx-auto px-6 lg:px-12">
-        {/* --- TOP SECTION: 3-COLUMN GRID --- */}
+        {/* --- TOP SECTION: 3-COLUMN LAYOUT --- */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-24 mb-12">
-          {/* Column 1: Brand & About */}
+          {/* Column 1: Brand Identity & Hackathon Context */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="bg-green-600 p-1.5 rounded-lg">
@@ -84,6 +92,8 @@ export default function Footer() {
               <li>
                 <a
                   href="https://github.com/kislayanand1803/MediKiosk-prototype/blob/main/ARCHITECTURE.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="hover:text-green-400 transition flex items-center gap-2 group"
                 >
                   <FileText
@@ -96,6 +106,8 @@ export default function Footer() {
               <li>
                 <a
                   href="https://github.com/kislayanand1803/MediKiosk-prototype"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="hover:text-green-400 transition flex items-center gap-2 group"
                 >
                   <Code2
@@ -108,7 +120,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Column 3: Legal & Support */}
+          {/* Column 3: Legal Compliance & Support */}
           <div>
             <h4 className="text-white font-bold tracking-wide uppercase text-sm mb-4">
               Compliance & Support
@@ -117,6 +129,8 @@ export default function Footer() {
               <li>
                 <a
                   href="https://www.meity.gov.in/static/uploads/2024/06/2bf1f0e9f04e6fb4f8fef35e82c42aa5.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="hover:text-green-400 transition flex items-center gap-2"
                 >
                   <Shield size={14} className="text-slate-600" />
@@ -126,10 +140,24 @@ export default function Footer() {
               <li>
                 <a
                   href="https://abdm.gov.in/strapicms/uploads/privacypolicy_178041845b.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="hover:text-green-400 transition flex items-center gap-2"
                 >
                   <Shield size={14} className="text-slate-600" />
                   ABDM Privacy Policy
+                </a>
+              </li>
+              {/* National List of Essential Ayush Medicines (NLEAM) Reference */}
+              <li>
+                <a
+                  href="https://upayushsociety.com/doc/GO/New%20EDL%20(NLEAM)-%20A+H+U.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-green-400 transition flex items-center gap-2"
+                >
+                  <BookOpen size={14} className="text-slate-600" />
+                  National List of Essential Ayush Medicines (NLEAM)
                 </a>
               </li>
               <li>
@@ -144,6 +172,8 @@ export default function Footer() {
               <li>
                 <a
                   href="mailto:arise.coder@gmail.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="hover:text-green-400 transition flex items-center gap-2"
                 >
                   <Mail size={14} className="text-slate-600" />
@@ -155,11 +185,11 @@ export default function Footer() {
         </div>
 
         {/* Divider Line */}
-        <div className="border-t border-slate-800/80 mb-8"></div>
+        <div className="border-t border-slate-800/80 mb-8" />
 
-        {/* --- BOTTOM SECTION: ATTRIBUTION & SOCIALS --- */}
+        {/* --- BOTTOM SECTION: ATTRIBUTION & ACTIONS --- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-          {/* Left Side: Consolidated Attribution & Copyright */}
+          {/* Government Attribution & Copyright Notice */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-xs sm:text-sm">
               <Building2
@@ -185,10 +215,12 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Right Side: Social Icons & Back to Top */}
+          {/* Social Links & Smooth Scroll Action */}
           <div className="flex items-center gap-5 pb-1">
             <a
               href="https://github.com/kislayanand1803/MediKiosk-prototype"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-slate-500 hover:text-white transition"
               title="Repository"
             >
