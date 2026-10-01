@@ -101,7 +101,7 @@ export default function LoginScreen({ onBackHome }) {
       // Brief role confirmation before navigating
       setSuccessRole(ROLE_LABELS[profile.role] || "Staff Portal");
 
-      // Wait 600ms so the user reads the success message before the screen changes
+      // Wait 800ms so the user reads the success message before the screen changes
       setTimeout(() => {
         switch (profile.role) {
           case "nurse":
@@ -118,7 +118,7 @@ export default function LoginScreen({ onBackHome }) {
             navigate("/doctor");
             break;
         }
-      }, 1000);
+      }, 800);
     }
   };
 
