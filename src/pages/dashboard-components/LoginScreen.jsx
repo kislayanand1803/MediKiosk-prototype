@@ -118,7 +118,7 @@ export default function LoginScreen({ onBackHome }) {
             navigate("/doctor");
             break;
         }
-      }, 600);
+      }, 1000);
     }
   };
 
