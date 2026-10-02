@@ -43,11 +43,18 @@ export function useDoctorSession() {
       } = await supabase.auth.getSession();
 
       if (session?.user) {
-        const { data: prof } = await supabase
+        const { data: prof, error: profileError } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", session.user.id)
           .single();
+
+        if (profileError) {
+          console.warn(
+            "RBAC Profile fetch failed on load:",
+            profileError.message,
+          );
+        }
         if (mounted) {
           setSession(session);
           setProfile(prof);
@@ -67,11 +74,18 @@ export function useDoctorSession() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         if (newSession?.user) {
-          const { data: prof } = await supabase
+          const { data: prof, error: profileError } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", newSession.user.id)
             .single();
+
+          if (profileError) {
+            console.warn(
+              "RBAC Profile fetch failed on auth change:",
+              profileError.message,
+            );
+          }
           if (mounted) {
             setSession(newSession);
             setProfile(prof);
